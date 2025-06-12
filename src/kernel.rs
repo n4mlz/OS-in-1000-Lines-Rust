@@ -1,7 +1,12 @@
 #![no_main]
 #![no_std]
 
-use core::{arch::asm, panic::PanicInfo, ptr};
+use core::{
+    arch::asm,
+    fmt::{self, Write},
+    panic::PanicInfo,
+    ptr,
+};
 
 unsafe extern "C" {
     static mut __bss: u8;
@@ -46,6 +51,31 @@ fn putchar(c: u8) -> Result<(), isize> {
     Ok(())
 }
 
+macro_rules! print {
+    ($($arg:tt)*) => ($crate::_print(format_args!($($arg)*)));
+}
+
+macro_rules! println {
+    ($fmt:expr) => (print!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
+}
+
+pub fn _print(args: fmt::Arguments) {
+    let mut writer = Writer {};
+    writer.write_fmt(args).unwrap();
+}
+
+struct Writer;
+
+impl Write for Writer {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        for c in s.bytes() {
+            putchar(c).unwrap();
+        }
+        Ok(())
+    }
+}
+
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.boot")]
 pub extern "C" fn boot() -> ! {
@@ -68,6 +98,8 @@ fn kernel_main() -> ! {
         let bss_end = ptr::addr_of!(__bss_end);
         ptr::write_bytes(bss, 0, bss_end as usize - bss as usize);
     }
+
+    println!("Hello, World!");
 
     loop {}
 }
