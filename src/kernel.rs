@@ -52,17 +52,15 @@ fn putchar(c: u8) -> Result<(), isize> {
 }
 
 macro_rules! print {
-    ($($arg:tt)*) => ($crate::_print(format_args!($($arg)*)));
+    ($($arg:tt)*) => ({
+        let _ = write!(Writer, $($arg)*);
+    });
 }
 
 macro_rules! println {
-    ($fmt:expr) => (print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print!(concat!($fmt, "\n"), $($arg)*));
-}
-
-pub fn _print(args: fmt::Arguments) {
-    let mut writer = Writer {};
-    writer.write_fmt(args).unwrap();
+    ($($arg:tt)*) => ({
+        print!("{}\n", format_args!($($arg)*));
+    });
 }
 
 struct Writer;
@@ -100,11 +98,17 @@ fn kernel_main() -> ! {
     }
 
     println!("Hello, World!");
+    panic!("Kernel panic: This is a test panic!");
 
     loop {}
 }
 
 #[panic_handler]
-fn panic(_panic: &PanicInfo<'_>) -> ! {
-    loop {}
+fn panic(info: &PanicInfo) -> ! {
+    println!("{info}");
+    loop {
+        unsafe {
+            asm!("wfi");
+        }
+    }
 }
