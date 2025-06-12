@@ -1,2 +1,3 @@
 /target
 opensbi-riscv32-generic-fw_dynamic.bin
+kernel.map
