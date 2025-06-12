@@ -40,6 +40,12 @@ fn sbi_call(
     if err < 0 { Err(err) } else { Ok(value) }
 }
 
+fn putchar(c: u8) -> Result<(), isize> {
+    sbi_call(c as usize, 0, 0, 0, 0, 0, 0, 1)?;
+
+    Ok(())
+}
+
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.boot")]
 pub extern "C" fn boot() -> ! {
