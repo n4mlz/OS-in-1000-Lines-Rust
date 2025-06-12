@@ -98,11 +98,17 @@ fn kernel_main() -> ! {
     }
 
     println!("Hello, World!");
+    panic!("Kernel panic: This is a test panic!");
 
     loop {}
 }
 
 #[panic_handler]
-fn panic(_panic: &PanicInfo<'_>) -> ! {
-    loop {}
+fn panic(info: &PanicInfo) -> ! {
+    println!("{info}");
+    loop {
+        unsafe {
+            asm!("wfi");
+        }
+    }
 }
