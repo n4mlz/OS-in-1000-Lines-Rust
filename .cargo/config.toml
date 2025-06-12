@@ -2,4 +2,4 @@
 target = "riscv32i-unknown-none-elf"
 
 [target.riscv32i-unknown-none-elf]
-runner = "qemu-system-riscv32 -machine virt -bios default -nographic -serial mon:stdio --no-reboot -kernel"
+runner = "qemu-system-riscv32 -machine virt -bios opensbi-riscv32-generic-fw_dynamic.bin -nographic -serial mon:stdio --no-reboot -kernel"
