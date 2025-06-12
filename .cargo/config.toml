@@ -1,0 +1,9 @@
+[build]
+target = "riscv32i-unknown-none-elf"
+
+[target.riscv32i-unknown-none-elf]
+rustflags = [
+    "-Clink-arg=-Tkernel.ld",
+    "-Clink-arg=-Map=kernel.map"
+]
+runner = "qemu-system-riscv32 -machine virt -bios opensbi-riscv32-generic-fw_dynamic.bin -nographic -serial mon:stdio --no-reboot -kernel"
