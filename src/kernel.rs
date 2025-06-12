@@ -68,7 +68,7 @@ struct Writer;
 impl Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         for c in s.bytes() {
-            putchar(c).unwrap();
+            putchar(c).map_err(|_| fmt::Error)?;
         }
         Ok(())
     }
