@@ -194,7 +194,7 @@ pub struct TrapFrame {
 
 macro_rules! read_csr {
     ($csr:literal) => {{
-        let mut val: u32;
+        let mut val: usize;
         unsafe {
             asm!(concat!("csrr {}, ", $csr), out(reg) val);
         }
@@ -213,7 +213,7 @@ fn handle_trap(_: &TrapFrame) {
     let stval = read_csr!("stval");
     let sepc = read_csr!("sepc");
 
-    panic!("scause: {scause}, stval: {stval}, sepc: {sepc}");
+    panic!("unexpected trap scause: {scause:x}, stval: {stval:x}, sepc: {sepc:x}");
 }
 
 #[unsafe(no_mangle)]
@@ -240,9 +240,10 @@ fn kernel_main() -> ! {
     }
 
     println!("Hello, World!");
-    panic!("Kernel panic: This is a test panic!");
 
-    loop {}
+    unsafe { asm!("unimp") };
+
+    unreachable!();
 }
 
 #[panic_handler]
