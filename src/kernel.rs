@@ -76,20 +76,18 @@ impl Write for Writer {
 
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.boot")]
-pub extern "C" fn boot() -> ! {
+extern "C" fn boot() -> ! {
     unsafe {
         asm!(
             "mv sp, {stack_top}
             j {kernel_main}",
             stack_top = in(reg) &__stack_top,
             kernel_main = sym kernel_main,
+            options(noreturn)
         );
     }
-
-    loop {}
 }
 
-#[unsafe(no_mangle)]
 fn kernel_main() -> ! {
     unsafe {
         let bss = ptr::addr_of_mut!(__bss);
