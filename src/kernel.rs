@@ -118,7 +118,7 @@ unsafe extern "C" fn kernel_entry() {
         sw a0, 4 * 30(sp)
 
         mv a0, sp
-        call handle_trap
+        call {handle_trap}
 
         lw ra,  4 * 0(sp)
         lw gp,  4 * 1(sp)
@@ -153,6 +153,7 @@ unsafe extern "C" fn kernel_entry() {
         lw sp,  4 * 30(sp)
         sret
         ",
+        handle_trap = sym handle_trap,
     );
 }
 
@@ -207,6 +208,14 @@ macro_rules! write_csr {
     }};
 }
 
+fn handle_trap(_: &TrapFrame) {
+    let scause = read_csr!("scause");
+    let stval = read_csr!("stval");
+    let sepc = read_csr!("sepc");
+
+    panic!("scause: {scause}, stval: {stval}, sepc: {sepc}");
+}
+
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.boot")]
 extern "C" fn boot() -> ! {
@@ -226,6 +235,8 @@ fn kernel_main() -> ! {
         let bss = ptr::addr_of_mut!(__bss);
         let bss_end = ptr::addr_of!(__bss_end);
         ptr::write_bytes(bss, 0, bss_end as usize - bss as usize);
+
+        write_csr!("stvec", kernel_entry);
     }
 
     println!("Hello, World!");
