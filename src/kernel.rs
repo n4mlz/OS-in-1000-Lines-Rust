@@ -191,6 +191,22 @@ pub struct TrapFrame {
     sp: usize,
 }
 
+macro_rules! read_csr {
+    ($csr:literal) => {{
+        let mut val: u32;
+        unsafe {
+            asm!(concat!("csrr {}, ", $csr), out(reg) val);
+        }
+        val
+    }};
+}
+
+macro_rules! write_csr {
+    ($csr:literal, $val:expr) => {{
+        asm!(concat!("csrw ", $csr, ", {}"), in(reg) $val);
+    }};
+}
+
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.boot")]
 extern "C" fn boot() -> ! {
