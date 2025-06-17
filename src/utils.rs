@@ -51,6 +51,11 @@ impl Write for Writer {
     }
 }
 
+pub fn align_up(value: usize, align: usize) -> usize {
+    let r = value % align;
+    if r == 0 { value } else { value + (align - r) }
+}
+
 pub trait Addr {
     fn get(&self) -> usize;
     fn from_usize(addr: usize) -> Self;
@@ -64,6 +69,7 @@ pub trait Addr {
     fn as_ptr_mut(&self) -> *mut u8 {
         self.get() as *mut u8
     }
+    fn align_up(&self, align: usize) -> Self;
 }
 
 macro_rules! impl_addr {
@@ -81,6 +87,10 @@ macro_rules! impl_addr {
 
             fn from_ptr(addr: *const u8) -> Self {
                 $name(addr as usize)
+            }
+
+            fn align_up(&self, align: usize) -> Self {
+                $name(align_up(self.get(), align))
             }
         }
     };
