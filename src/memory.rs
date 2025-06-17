@@ -4,7 +4,10 @@ use core::{
     ptr,
 };
 
-use crate::constants::{FREE_RAM, FREE_RAM_END};
+use crate::{
+    constants::{FREE_RAM, FREE_RAM_END, PAGE_SIZE},
+    utils::{Addr, PhysAddr},
+};
 
 struct Alocator {
     head: UnsafeCell<*mut u8>,
@@ -52,3 +55,21 @@ unsafe impl GlobalAlloc for Alocator {
 
 #[global_allocator]
 static HEAP: Alocator = unsafe { Alocator::new(FREE_RAM, FREE_RAM_END) };
+
+pub fn alloc_pages(num: usize) -> PhysAddr {
+    let size = num * PAGE_SIZE;
+
+    let layout = match Layout::from_size_align(size, PAGE_SIZE) {
+        Ok(layout) => layout,
+        Err(_) => {
+            panic!("Invalid layout for allocation");
+        }
+    };
+
+    let ptr = unsafe { HEAP.alloc(layout) };
+    if ptr.is_null() {
+        panic!("Out of memory");
+    }
+
+    PhysAddr::from_ptr(ptr)
+}

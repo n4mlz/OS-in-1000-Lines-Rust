@@ -11,3 +11,5 @@ pub static mut BSS_END: *const u8 = &raw const __bss_end;
 pub static mut STACK_TOP: *const u8 = &raw const __stack_top;
 pub static mut FREE_RAM: *mut u8 = &raw mut __free_ram;
 pub static mut FREE_RAM_END: *const u8 = &raw const __free_ram_end;
+
+pub const PAGE_SIZE: usize = 4096;

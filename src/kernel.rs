@@ -12,7 +12,9 @@ use core::{arch::asm, fmt::Write, panic::PanicInfo, ptr};
 
 use crate::{
     constants::{BSS, BSS_END, STACK_TOP},
+    memory::alloc_pages,
     trap_handler::kernel_entry,
+    utils::Addr,
 };
 
 #[unsafe(no_mangle)]
@@ -37,6 +39,12 @@ fn kernel_main() -> ! {
     }
 
     println!("Hello, World!");
+
+    let paddr0 = alloc_pages(2).as_usize();
+    let paddr1 = alloc_pages(1).as_usize();
+
+    println!("alloc_pages test: paddr0 = {paddr0:x}");
+    println!("alloc_pages test: paddr1 = {paddr1:x}");
 
     unsafe { asm!("unimp") };
 
