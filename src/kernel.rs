@@ -2,18 +2,20 @@
 #![no_std]
 #![feature(fn_align)]
 
+mod constants;
+mod memory;
 mod sbi;
 mod trap_handler;
 mod utils;
 
-use crate::trap_handler::kernel_entry;
 use core::{arch::asm, fmt::Write, panic::PanicInfo, ptr};
 
-unsafe extern "C" {
-    static mut __bss: u8;
-    static __bss_end: u8;
-    static __stack_top: u8;
-}
+use crate::{
+    constants::{BSS, BSS_END, STACK_TOP},
+    memory::alloc_pages,
+    trap_handler::kernel_entry,
+    utils::Addr,
+};
 
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.boot")]
@@ -22,7 +24,7 @@ extern "C" fn boot() -> ! {
         asm!(
             "mv sp, {stack_top}
             j {kernel_main}",
-            stack_top = in(reg) &__stack_top,
+            stack_top = in(reg) STACK_TOP,
             kernel_main = sym kernel_main,
             options(noreturn)
         );
@@ -31,14 +33,18 @@ extern "C" fn boot() -> ! {
 
 fn kernel_main() -> ! {
     unsafe {
-        let bss = ptr::addr_of_mut!(__bss);
-        let bss_end = ptr::addr_of!(__bss_end);
-        ptr::write_bytes(bss, 0, bss_end as usize - bss as usize);
+        ptr::write_bytes(BSS, 0, BSS_END.offset_from(BSS) as usize);
 
         write_csr!("stvec", kernel_entry);
     }
 
     println!("Hello, World!");
+
+    let paddr0 = alloc_pages(2).as_usize();
+    let paddr1 = alloc_pages(1).as_usize();
+
+    println!("alloc_pages test: paddr0 = {paddr0:x}");
+    println!("alloc_pages test: paddr1 = {paddr1:x}");
 
     unsafe { asm!("unimp") };
 
