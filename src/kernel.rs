@@ -15,9 +15,9 @@ unsafe extern "C" {
     static __stack_top: u8;
 }
 
-static mut BSS: *mut u8 = ptr::addr_of_mut!(__bss);
-static mut BSS_END: *const u8 = ptr::addr_of!(__bss_end);
-static mut STACK_TOP: *const u8 = ptr::addr_of!(__stack_top);
+static mut BSS: *mut u8 = &raw mut __bss;
+static mut BSS_END: *const u8 = &raw const __bss_end;
+static mut STACK_TOP: *const u8 = &raw const __stack_top;
 
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.boot")]
