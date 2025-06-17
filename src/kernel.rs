@@ -2,22 +2,16 @@
 #![no_std]
 #![feature(fn_align)]
 
+mod constants;
 mod sbi;
 mod trap_handler;
 mod utils;
 
-use crate::trap_handler::kernel_entry;
+use crate::{
+    constants::{BSS, BSS_END, STACK_TOP},
+    trap_handler::kernel_entry,
+};
 use core::{arch::asm, fmt::Write, panic::PanicInfo, ptr};
-
-unsafe extern "C" {
-    static mut __bss: u8;
-    static __bss_end: u8;
-    static __stack_top: u8;
-}
-
-static mut BSS: *mut u8 = &raw mut __bss;
-static mut BSS_END: *const u8 = &raw const __bss_end;
-static mut STACK_TOP: *const u8 = &raw const __stack_top;
 
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.boot")]
