@@ -3,15 +3,17 @@
 #![feature(fn_align)]
 
 mod constants;
+mod memory;
 mod sbi;
 mod trap_handler;
 mod utils;
+
+use core::{arch::asm, fmt::Write, panic::PanicInfo, ptr};
 
 use crate::{
     constants::{BSS, BSS_END, STACK_TOP},
     trap_handler::kernel_entry,
 };
-use core::{arch::asm, fmt::Write, panic::PanicInfo, ptr};
 
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.boot")]

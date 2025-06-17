@@ -1,0 +1,51 @@
+use core::{
+    alloc::{GlobalAlloc, Layout},
+    cell::UnsafeCell,
+    ptr,
+};
+
+use crate::constants::{FREE_RAM, FREE_RAM_END};
+
+struct Alocator {
+    head: UnsafeCell<*mut u8>,
+    end: *const u8,
+}
+
+impl Alocator {
+    const fn new(start: *mut u8, end: *const u8) -> Self {
+        Alocator {
+            head: UnsafeCell::new(start),
+            end,
+        }
+    }
+}
+
+unsafe impl Sync for Alocator {}
+
+unsafe impl GlobalAlloc for Alocator {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        let head = unsafe { *self.head.get() };
+
+        let size = layout.size();
+        let align = layout.align();
+
+        let padding = head.align_offset(align);
+        let alloc_start = unsafe { head.add(padding) };
+        let alloc_end = unsafe { alloc_start.add(size) };
+
+        if alloc_end as *const u8 > self.end {
+            ptr::null_mut()
+        } else {
+            let head_ptr = self.head.get();
+            unsafe {
+                *head_ptr = alloc_end;
+            }
+            alloc_start
+        }
+    }
+
+    unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {}
+}
+
+#[global_allocator]
+static HEAP: Alocator = unsafe { Alocator::new(FREE_RAM, FREE_RAM_END) };
