@@ -36,10 +36,13 @@ unsafe impl GlobalAlloc for Alocator {
         if alloc_end as *const u8 > self.end {
             ptr::null_mut()
         } else {
+            unsafe { ptr::write_bytes(alloc_start, 0, size) };
+
             let head_ptr = self.head.get();
             unsafe {
                 *head_ptr = alloc_end;
             }
+
             alloc_start
         }
     }
