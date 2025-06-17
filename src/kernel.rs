@@ -15,6 +15,10 @@ unsafe extern "C" {
     static __stack_top: u8;
 }
 
+static mut BSS: *mut u8 = ptr::addr_of_mut!(__bss);
+static mut BSS_END: *const u8 = ptr::addr_of!(__bss_end);
+static mut STACK_TOP: *const u8 = ptr::addr_of!(__stack_top);
+
 #[unsafe(no_mangle)]
 #[unsafe(link_section = ".text.boot")]
 extern "C" fn boot() -> ! {
@@ -22,7 +26,7 @@ extern "C" fn boot() -> ! {
         asm!(
             "mv sp, {stack_top}
             j {kernel_main}",
-            stack_top = in(reg) &__stack_top,
+            stack_top = in(reg) STACK_TOP,
             kernel_main = sym kernel_main,
             options(noreturn)
         );
@@ -31,9 +35,7 @@ extern "C" fn boot() -> ! {
 
 fn kernel_main() -> ! {
     unsafe {
-        let bss = ptr::addr_of_mut!(__bss);
-        let bss_end = ptr::addr_of!(__bss_end);
-        ptr::write_bytes(bss, 0, bss_end as usize - bss as usize);
+        ptr::write_bytes(BSS, 0, BSS_END.offset_from(BSS) as usize);
 
         write_csr!("stvec", kernel_entry);
     }
