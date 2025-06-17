@@ -50,3 +50,41 @@ impl Write for Writer {
         Ok(())
     }
 }
+
+pub trait Addr {
+    fn get(&self) -> usize;
+    fn from_usize(addr: usize) -> Self;
+    fn from_ptr(addr: *const u8) -> Self;
+    fn as_usize(&self) -> usize {
+        self.get()
+    }
+    fn as_ptr(&self) -> *const u8 {
+        self.get() as *const u8
+    }
+    fn as_ptr_mut(&self) -> *mut u8 {
+        self.get() as *mut u8
+    }
+}
+
+macro_rules! impl_addr {
+    ($name:ident) => {
+        #[derive(Copy, Clone)]
+        pub struct $name(usize);
+        impl Addr for $name {
+            fn get(&self) -> usize {
+                self.0
+            }
+
+            fn from_usize(addr: usize) -> Self {
+                $name(addr)
+            }
+
+            fn from_ptr(addr: *const u8) -> Self {
+                $name(addr as usize)
+            }
+        }
+    };
+}
+
+impl_addr!(PhysAddr);
+impl_addr!(VirtAddr);
