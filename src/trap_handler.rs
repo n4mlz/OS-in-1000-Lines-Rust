@@ -4,7 +4,6 @@ use crate::read_csr;
 
 #[unsafe(naked)]
 #[repr(align(4))]
-#[unsafe(no_mangle)]
 pub unsafe extern "C" fn kernel_entry() {
     naked_asm!(
         "
