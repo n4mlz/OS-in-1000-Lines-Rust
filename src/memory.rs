@@ -1,6 +1,6 @@
 use core::{
     alloc::{GlobalAlloc, Layout},
-    cell::UnsafeCell,
+    cell::RefCell,
     ptr,
 };
 
@@ -10,14 +10,14 @@ use crate::{
 };
 
 struct Alocator {
-    head: UnsafeCell<*mut u8>,
+    head: RefCell<*mut u8>,
     end: *const u8,
 }
 
 impl Alocator {
     const fn new(start: *mut u8, end: *const u8) -> Self {
         Alocator {
-            head: UnsafeCell::new(start),
+            head: RefCell::new(start),
             end,
         }
     }
@@ -27,7 +27,7 @@ unsafe impl Sync for Alocator {}
 
 unsafe impl GlobalAlloc for Alocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        let head = unsafe { *self.head.get() };
+        let head = *self.head.borrow();
 
         let size = layout.size();
         let align = layout.align();
@@ -41,10 +41,8 @@ unsafe impl GlobalAlloc for Alocator {
         } else {
             unsafe { ptr::write_bytes(alloc_start, 0, size) };
 
-            let head_ptr = self.head.get();
-            unsafe {
-                *head_ptr = alloc_end;
-            }
+            let mut head = self.head.borrow_mut();
+            *head = alloc_end;
 
             alloc_start
         }
