@@ -14,6 +14,7 @@ use core::{arch::asm, fmt::Write, panic::PanicInfo, ptr};
 use crate::{
     constants::{BSS, BSS_END, STACK_TOP},
     memory::alloc_pages,
+    process::PM,
     trap_handler::kernel_entry,
     utils::Addr,
 };
@@ -46,6 +47,8 @@ fn kernel_main() -> ! {
 
     println!("alloc_pages test: paddr0 = {paddr0:x}");
     println!("alloc_pages test: paddr1 = {paddr1:x}");
+
+    PM.switch();
 
     unsafe { asm!("unimp") };
 

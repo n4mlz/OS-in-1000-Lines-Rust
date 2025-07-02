@@ -1,7 +1,7 @@
-use core::arch::naked_asm;
+use core::{arch::naked_asm, cell::RefCell};
 
 use crate::{
-    constants::KERNEL_STACK_SIZE,
+    constants::{KERNEL_STACK_SIZE, PROCS_MAX},
     utils::{Addr, VirtAddr},
 };
 
@@ -31,7 +31,7 @@ struct Context {
 }
 
 impl Context {
-    fn new() -> Self {
+    const fn new() -> Self {
         Context {
             ra: 0,
             sp: 0,
@@ -60,7 +60,7 @@ struct Process {
 }
 
 impl Process {
-    fn new() -> Self {
+    const fn new() -> Self {
         Process {
             pid: 0,
             state: State::Unused,
@@ -70,30 +70,35 @@ impl Process {
     }
 }
 
-struct ProcessManager {
-    procs: [Process; 8],
-    current: usize,
+pub struct ProcessManager {
+    procs: [RefCell<Process>; PROCS_MAX],
+    current: RefCell<usize>,
 }
 
 impl ProcessManager {
-    fn new() -> Self {
+    pub const fn new() -> Self {
         let idle_idx = 0;
 
         let mut pm = ProcessManager {
-            procs: [Process::new(); 8],
-            current: idle_idx,
+            procs: [const { RefCell::new(Process::new()) }; PROCS_MAX],
+            current: RefCell::new(idle_idx),
         };
 
-        let proc = &mut pm.procs[idle_idx];
-        proc.pid = 0;
-        proc.state = State::Runnable;
+        let mut idle_proc = Process::new();
+        idle_proc.pid = 0;
+        idle_proc.state = State::Runnable;
+
+        pm.procs[idle_idx] = RefCell::new(idle_proc);
 
         pm
     }
 
-    fn crate_process(&mut self, pc: VirtAddr) -> Option<u32> {
-        let idx = self.procs.iter().position(|p| p.state == State::Unused)?;
-        let proc = &mut self.procs[idx];
+    pub fn crate_process(&self, pc: VirtAddr) -> Option<u32> {
+        let idx = self
+            .procs
+            .iter()
+            .position(|p| p.borrow().state == State::Unused)?;
+        let mut proc = self.procs[idx].borrow_mut();
 
         proc.pid = idx as u32 + 1;
         proc.state = State::Runnable;
@@ -143,33 +148,34 @@ impl ProcessManager {
         )
     }
 
-    fn switch(&mut self) {
-        let current = self.current;
+    pub fn switch(&self) {
+        let mut current = self.current.borrow_mut();
         let next = self
             .procs
             .iter()
             .enumerate()
-            .find(|&(i, proc)| i != current && proc.pid != 0 && proc.state == State::Runnable)
+            .find(|&(i, proc)| {
+                i != *current && proc.borrow().pid != 0 && proc.borrow().state == State::Runnable
+            })
             .map(|(i, _)| i);
 
-        if next.is_none() && self.procs[current].state == State::Runnable {
+        if next.is_none() && self.procs[*current].borrow().state == State::Runnable {
             return;
         }
 
         let next = next.unwrap_or(0);
 
-        let (current_proc, next_proc) = if current < next {
-            let (left, right) = self.procs.split_at_mut(next);
-            (&mut left[current], &right[0])
-        } else {
-            let (left, right) = self.procs.split_at_mut(current);
-            (&mut left[0], &right[next])
-        };
+        let mut current_proc = self.procs[*current].borrow_mut();
+        let next_proc = self.procs[next].borrow();
 
         unsafe {
             Self::switch_context(&mut current_proc.context, &next_proc.context);
         }
 
-        self.current = next;
+        *current = next;
     }
 }
+
+unsafe impl Sync for ProcessManager {}
+
+pub static PM: ProcessManager = ProcessManager::new();

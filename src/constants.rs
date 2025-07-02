@@ -16,4 +16,4 @@ pub const PAGE_SIZE: usize = 4096;
 
 pub const KERNEL_STACK_SIZE: usize = 8192;
 
-pub const PROCS_MAX: u32 = 8;
+pub const PROCS_MAX: usize = 8;
