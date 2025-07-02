@@ -4,6 +4,7 @@
 
 mod constants;
 mod memory;
+mod process;
 mod sbi;
 mod trap_handler;
 mod utils;
