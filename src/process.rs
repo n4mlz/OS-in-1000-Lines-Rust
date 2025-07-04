@@ -1,9 +1,6 @@
 use core::{arch::naked_asm, cell::RefCell};
 
-use crate::{
-    constants::{KERNEL_STACK_SIZE, PROCS_MAX},
-    utils::{Addr, VirtAddr},
-};
+use crate::constants::{KERNEL_STACK_SIZE, PROCS_MAX};
 
 #[derive(Clone, Copy, PartialEq)]
 enum State {
@@ -93,7 +90,7 @@ impl ProcessManager {
         pm
     }
 
-    pub fn crate_process(&self, pc: VirtAddr) -> Option<u32> {
+    pub fn crate_process(&self, pc: usize) -> Option<u32> {
         let idx = self
             .procs
             .iter()
@@ -102,7 +99,7 @@ impl ProcessManager {
 
         proc.pid = idx as u32 + 1;
         proc.state = State::Runnable;
-        proc.context.ra = pc.as_usize();
+        proc.context.ra = pc;
         proc.context.sp = proc.stack.as_ptr() as usize + KERNEL_STACK_SIZE;
 
         Some(proc.pid)
@@ -149,6 +146,8 @@ impl ProcessManager {
     }
 
     pub fn switch(&self) {
+        let idle_idx = 0;
+
         let mut current = self.current.borrow_mut();
         let next = self
             .procs
@@ -163,16 +162,16 @@ impl ProcessManager {
             return;
         }
 
-        let next = next.unwrap_or(0);
+        let next = next.unwrap_or(idle_idx);
 
         let mut current_proc = self.procs[*current].borrow_mut();
         let next_proc = self.procs[next].borrow();
 
+        *current = next;
+
         unsafe {
             Self::switch_context(&mut current_proc.context, &next_proc.context);
         }
-
-        *current = next;
     }
 }
 
