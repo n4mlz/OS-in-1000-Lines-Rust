@@ -4,6 +4,7 @@
 
 mod constants;
 mod memory;
+mod playground;
 mod process;
 mod sbi;
 mod trap_handler;
@@ -47,6 +48,9 @@ fn kernel_main() -> ! {
 
     println!("alloc_pages test: paddr0 = {paddr0:x}");
     println!("alloc_pages test: paddr1 = {paddr1:x}");
+
+    PM.crate_process(playground::proc_a_entry as usize);
+    PM.crate_process(playground::proc_b_entry as usize);
 
     PM.switch();
 
