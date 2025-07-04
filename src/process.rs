@@ -1,4 +1,7 @@
-use core::{arch::naked_asm, cell::RefCell};
+use core::{
+    arch::{asm, naked_asm},
+    cell::RefCell,
+};
 
 use crate::constants::{KERNEL_STACK_SIZE, PROCS_MAX};
 
@@ -171,6 +174,14 @@ impl ProcessManager {
 
         let current_context = &mut current_proc.context as *mut Context;
         let next_context = &next_proc.context as *const Context;
+
+        let next_stack_top = next_proc.stack.as_ptr() as usize + KERNEL_STACK_SIZE;
+
+        unsafe {
+            asm!("csrw sscratch, {sscratch}",
+            sscratch = in(reg) next_stack_top,
+            );
+        }
 
         drop(current);
         drop(current_proc);
