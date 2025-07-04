@@ -107,7 +107,7 @@ impl ProcessManager {
 
     #[unsafe(naked)]
     #[repr(align(4))]
-    unsafe extern "C" fn switch_context(old: &mut Context, new: &Context) {
+    unsafe extern "C" fn switch_context(old: *mut Context, new: *const Context) {
         naked_asm!(
             "
             sw ra,  4 * 0(a0)
@@ -169,8 +169,15 @@ impl ProcessManager {
 
         *current = next;
 
+        let current_context = &mut current_proc.context as *mut Context;
+        let next_context = &next_proc.context as *const Context;
+
+        drop(current);
+        drop(current_proc);
+        drop(next_proc);
+
         unsafe {
-            Self::switch_context(&mut current_proc.context, &next_proc.context);
+            Self::switch_context(current_context, next_context);
         }
     }
 }
