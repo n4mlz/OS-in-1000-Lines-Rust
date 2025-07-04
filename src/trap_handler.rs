@@ -4,11 +4,11 @@ use crate::read_csr;
 
 #[unsafe(naked)]
 #[repr(align(4))]
-#[unsafe(no_mangle)]
 pub unsafe extern "C" fn kernel_entry() {
     naked_asm!(
         "
-        csrw sscratch, sp
+        csrrw sp, sscratch, sp
+
         addi sp, sp, -4 * 31
         sw ra,  4 * 0(sp)
         sw gp,  4 * 1(sp)
@@ -43,6 +43,9 @@ pub unsafe extern "C" fn kernel_entry() {
 
         csrr a0, sscratch
         sw a0, 4 * 30(sp)
+
+        addi a0, sp, 4 * 31
+        csrw sscratch, a0
 
         mv a0, sp
         call {handle_trap}

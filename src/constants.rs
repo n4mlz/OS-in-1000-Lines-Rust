@@ -13,3 +13,7 @@ pub static mut FREE_RAM: *mut u8 = &raw mut __free_ram;
 pub static mut FREE_RAM_END: *const u8 = &raw const __free_ram_end;
 
 pub const PAGE_SIZE: usize = 4096;
+
+pub const KERNEL_STACK_SIZE: usize = 8192;
+
+pub const PROCS_MAX: usize = 8;

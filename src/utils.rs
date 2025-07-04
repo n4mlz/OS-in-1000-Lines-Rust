@@ -57,17 +57,15 @@ pub fn align_up(value: usize, align: usize) -> usize {
 }
 
 pub trait Addr {
-    fn get(&self) -> usize;
     fn from_usize(addr: usize) -> Self;
     fn from_ptr(addr: *const u8) -> Self;
-    fn as_usize(&self) -> usize {
-        self.get()
-    }
+    fn null() -> Self;
+    fn as_usize(&self) -> usize;
     fn as_ptr(&self) -> *const u8 {
-        self.get() as *const u8
+        self.as_usize() as *const u8
     }
     fn as_ptr_mut(&self) -> *mut u8 {
-        self.get() as *mut u8
+        self.as_usize() as *mut u8
     }
     fn align_up(&self, align: usize) -> Self;
 }
@@ -77,10 +75,6 @@ macro_rules! impl_addr {
         #[derive(Copy, Clone)]
         pub struct $name(usize);
         impl Addr for $name {
-            fn get(&self) -> usize {
-                self.0
-            }
-
             fn from_usize(addr: usize) -> Self {
                 $name(addr)
             }
@@ -89,8 +83,16 @@ macro_rules! impl_addr {
                 $name(addr as usize)
             }
 
+            fn null() -> Self {
+                $name(0)
+            }
+
+            fn as_usize(&self) -> usize {
+                self.0
+            }
+
             fn align_up(&self, align: usize) -> Self {
-                $name(align_up(self.get(), align))
+                $name(align_up(self.as_usize(), align))
             }
         }
     };
