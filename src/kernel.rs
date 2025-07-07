@@ -41,6 +41,8 @@ fn kernel_main() -> ! {
         write_csr!("stvec", kernel_entry);
     }
 
+    PM.init();
+
     println!("Hello, World!");
 
     let paddr0 = alloc_pages(2).as_usize();

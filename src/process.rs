@@ -84,18 +84,20 @@ impl ProcessManager {
     pub const fn new() -> Self {
         let idle_idx = 0;
 
-        let mut pm = ProcessManager {
+        ProcessManager {
             procs: [const { RefCell::new(Process::new()) }; PROCS_MAX],
             current: RefCell::new(idle_idx),
-        };
+        }
+    }
+
+    pub fn init(&self) {
+        let idle_idx = 0;
 
         let mut idle_proc = Process::new();
         idle_proc.pid = 0;
         idle_proc.state = State::Runnable;
 
-        pm.procs[idle_idx] = RefCell::new(idle_proc);
-
-        pm
+        self.procs[idle_idx].replace(idle_proc);
     }
 
     pub fn crate_process(&self, pc: usize) -> Option<u32> {
