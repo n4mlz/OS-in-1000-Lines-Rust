@@ -3,7 +3,10 @@ use core::{
     cell::RefCell,
 };
 
-use crate::constants::{KERNEL_STACK_SIZE, PROCS_MAX};
+use crate::{
+    constants::{KERNEL_STACK_SIZE, PROCS_MAX},
+    utils::{Addr, PhysAddr},
+};
 
 #[derive(Clone, Copy, PartialEq)]
 enum State {
@@ -55,6 +58,7 @@ impl Context {
 struct Process {
     pid: u32,
     state: State,
+    page_table: PhysAddr,
     context: Context,
     stack: [u8; KERNEL_STACK_SIZE],
 }
@@ -64,6 +68,7 @@ impl Process {
         Process {
             pid: 0,
             state: State::Unused,
+            page_table: PhysAddr::NULL,
             context: Context::new(),
             stack: [0; KERNEL_STACK_SIZE],
         }
