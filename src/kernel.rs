@@ -1,6 +1,6 @@
 #![no_main]
 #![no_std]
-#![feature(fn_align)]
+#![feature(fn_align, pointer_is_aligned_to)]
 
 mod constants;
 mod memory;
