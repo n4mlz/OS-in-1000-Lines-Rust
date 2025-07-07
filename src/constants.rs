@@ -1,4 +1,5 @@
 unsafe extern "C" {
+    static __kernel_base: u8;
     static mut __bss: u8;
     static __bss_end: u8;
     static __stack_top: u8;
@@ -6,6 +7,7 @@ unsafe extern "C" {
     static __free_ram_end: u8;
 }
 
+pub static mut KERNEL_BASE: *const u8 = &raw const __kernel_base;
 pub static mut BSS: *mut u8 = &raw mut __bss;
 pub static mut BSS_END: *const u8 = &raw const __bss_end;
 pub static mut STACK_TOP: *const u8 = &raw const __stack_top;
