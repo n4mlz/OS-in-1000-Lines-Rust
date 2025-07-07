@@ -14,6 +14,14 @@ pub static mut FREE_RAM_END: *const u8 = &raw const __free_ram_end;
 
 pub const PAGE_SIZE: usize = 4096;
 
+pub const SATP_SV32: usize = 1 << 31;
+
+pub const PAGE_V: u32 = 1 << 0;
+pub const PAGE_R: u32 = 1 << 1;
+pub const PAGE_W: u32 = 1 << 2;
+pub const PAGE_X: u32 = 1 << 3;
+pub const PAGE_U: u32 = 1 << 4;
+
 pub const KERNEL_STACK_SIZE: usize = 8192;
 
 pub const PROCS_MAX: usize = 8;
