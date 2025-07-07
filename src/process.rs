@@ -6,6 +6,7 @@ use core::{
 use crate::{
     constants::{
         FREE_RAM_END, KERNEL_BASE, KERNEL_STACK_SIZE, PAGE_R, PAGE_SIZE, PAGE_W, PAGE_X, PROCS_MAX,
+        SATP_SV32,
     },
     memory::{alloc_pages, map_page},
     utils::{Addr, PhysAddr, VirtAddr},
@@ -217,7 +218,13 @@ impl ProcessManager {
         let next_stack_top = next_proc.stack.as_ptr() as usize + KERNEL_STACK_SIZE;
 
         unsafe {
-            asm!("csrw sscratch, {sscratch}",
+            asm!("
+            sfence.vma
+            csrw satp, {satp}
+            sfence.vma
+            csrw sscratch, {sscratch}
+            ",
+            satp = in(reg) SATP_SV32 | (next_proc.page_table.as_usize() / PAGE_SIZE),
             sscratch = in(reg) next_stack_top,
             );
         }
