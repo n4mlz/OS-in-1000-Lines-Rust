@@ -5,8 +5,8 @@ use core::{
 };
 
 use crate::{
-    constants::{FREE_RAM, FREE_RAM_END, PAGE_SIZE},
-    utils::{Addr, PhysAddr},
+    constants::{FREE_RAM, FREE_RAM_END, PAGE_SIZE, PAGE_V},
+    utils::{Addr, PhysAddr, VirtAddr},
 };
 
 struct Alocator {
@@ -70,4 +70,25 @@ pub fn alloc_pages(num: usize) -> PhysAddr {
     }
 
     PhysAddr::from_ptr(ptr)
+}
+
+pub fn map_page(page_table: PhysAddr, vaddr: VirtAddr, paddr: PhysAddr, flags: u32) {
+    if !vaddr.is_aligned(PAGE_SIZE) || !paddr.is_aligned(PAGE_SIZE) {
+        panic!("Virtual and physical addresses must be page-aligned");
+    }
+
+    let table1 = page_table.as_usize() as *mut u32;
+    let vpn1 = ((vaddr.as_usize() >> 22) & 0x3ff) as isize;
+
+    if unsafe { *table1.offset(vpn1) } & PAGE_V == 0 {
+        let pt_paddr = alloc_pages(1);
+        unsafe { *table1.offset(vpn1) = ((pt_paddr.as_usize() / PAGE_SIZE) << 10) as u32 | PAGE_V };
+    }
+
+    let table0 = ((unsafe { *table1.offset(vpn1) } >> 10) * PAGE_SIZE as u32) as *mut u32;
+    let vpn0 = ((vaddr.as_usize() >> 12) & 0x3ff) as isize;
+
+    unsafe {
+        *(table0.offset(vpn0)) = ((paddr.as_usize() / PAGE_SIZE) << 10) as u32 | flags | PAGE_V
+    };
 }
