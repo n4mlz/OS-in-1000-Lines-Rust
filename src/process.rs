@@ -3,7 +3,14 @@ use core::{
     cell::RefCell,
 };
 
-use crate::constants::{KERNEL_STACK_SIZE, PROCS_MAX};
+use crate::{
+    constants::{
+        FREE_RAM_END, KERNEL_BASE, KERNEL_STACK_SIZE, PAGE_R, PAGE_SIZE, PAGE_W, PAGE_X, PROCS_MAX,
+        SATP_SV32,
+    },
+    memory::{alloc_pages, map_page},
+    utils::{Addr, PhysAddr, VirtAddr},
+};
 
 #[derive(Clone, Copy, PartialEq)]
 enum State {
@@ -55,6 +62,7 @@ impl Context {
 struct Process {
     pid: u32,
     state: State,
+    page_table: PhysAddr,
     context: Context,
     stack: [u8; KERNEL_STACK_SIZE],
 }
@@ -64,6 +72,7 @@ impl Process {
         Process {
             pid: 0,
             state: State::Unused,
+            page_table: PhysAddr::NULL,
             context: Context::new(),
             stack: [0; KERNEL_STACK_SIZE],
         }
@@ -79,18 +88,35 @@ impl ProcessManager {
     pub const fn new() -> Self {
         let idle_idx = 0;
 
-        let mut pm = ProcessManager {
+        ProcessManager {
             procs: [const { RefCell::new(Process::new()) }; PROCS_MAX],
             current: RefCell::new(idle_idx),
-        };
+        }
+    }
+
+    pub fn init(&self) {
+        let idle_idx = 0;
 
         let mut idle_proc = Process::new();
+
+        let page_table = alloc_pages(1);
+
+        let mut paddr = unsafe { KERNEL_BASE };
+        while paddr < unsafe { FREE_RAM_END } {
+            map_page(
+                page_table,
+                VirtAddr::from_ptr(paddr),
+                PhysAddr::from_ptr(paddr),
+                PAGE_R | PAGE_W | PAGE_X,
+            );
+            paddr = unsafe { paddr.add(PAGE_SIZE) };
+        }
+
         idle_proc.pid = 0;
         idle_proc.state = State::Runnable;
+        idle_proc.page_table = page_table;
 
-        pm.procs[idle_idx] = RefCell::new(idle_proc);
-
-        pm
+        self.procs[idle_idx].replace(idle_proc);
     }
 
     pub fn crate_process(&self, pc: usize) -> Option<u32> {
@@ -100,8 +126,22 @@ impl ProcessManager {
             .position(|p| p.borrow().state == State::Unused)?;
         let mut proc = self.procs[idx].borrow_mut();
 
+        let page_table = alloc_pages(1);
+
+        let mut paddr = unsafe { KERNEL_BASE };
+        while paddr < unsafe { FREE_RAM_END } {
+            map_page(
+                page_table,
+                VirtAddr::from_ptr(paddr),
+                PhysAddr::from_ptr(paddr),
+                PAGE_R | PAGE_W | PAGE_X,
+            );
+            paddr = unsafe { paddr.add(PAGE_SIZE) };
+        }
+
         proc.pid = idx as u32 + 1;
         proc.state = State::Runnable;
+        proc.page_table = page_table;
         proc.context.ra = pc;
         proc.context.sp = proc.stack.as_ptr() as usize + KERNEL_STACK_SIZE;
 
@@ -178,7 +218,13 @@ impl ProcessManager {
         let next_stack_top = next_proc.stack.as_ptr() as usize + KERNEL_STACK_SIZE;
 
         unsafe {
-            asm!("csrw sscratch, {sscratch}",
+            asm!("
+            sfence.vma
+            csrw satp, {satp}
+            sfence.vma
+            csrw sscratch, {sscratch}
+            ",
+            satp = in(reg) SATP_SV32 | (next_proc.page_table.as_usize() / PAGE_SIZE),
             sscratch = in(reg) next_stack_top,
             );
         }
