@@ -20,6 +20,13 @@ macro_rules! write_csr {
     }};
 }
 
+#[macro_export]
+macro_rules! write_csr_set {
+    ($csr:literal, $val:expr) => {{
+        asm!(concat!("csrs ", $csr, ", {}"), in(reg) $val);
+    }};
+}
+
 pub fn putchar(c: u8) -> Result<(), isize> {
     sbi_call(c as usize, 0, 0, 0, 0, 0, 0, 1)?;
 
