@@ -123,7 +123,7 @@ pub struct TrapFrame {
 }
 
 enum TrapCause {
-    Timer = 7,
+    Timer = 5,
 }
 
 fn handle_trap(_: &TrapFrame) {
@@ -131,12 +131,16 @@ fn handle_trap(_: &TrapFrame) {
     let stval = read_csr!("stval");
     let sepc = read_csr!("sepc");
 
-    match scause {
-        val if val == TrapCause::Timer as usize => {
-            handle_timer_irq();
-        }
-        _ => {
-            panic!("unexpected trap scause: {scause:x}, stval: {stval:x}, sepc: {sepc:x}");
+    if scause & 1 << 31 != 0 {
+        let irq = scause & 0x1f;
+
+        match irq {
+            val if val == TrapCause::Timer as usize => {
+                handle_timer_irq();
+            }
+            _ => {
+                panic!("unexpected trap scause: {scause:x}, stval: {stval:x}, sepc: {sepc:x}");
+            }
         }
     }
 }
