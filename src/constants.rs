@@ -27,3 +27,5 @@ pub const PAGE_U: u32 = 1 << 4;
 pub const KERNEL_STACK_SIZE: usize = 8192;
 
 pub const PROCS_MAX: usize = 8;
+
+pub const TIMER_QUANTUM_US: u64 = 100_000; // 100ms
