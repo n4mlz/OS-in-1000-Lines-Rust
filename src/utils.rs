@@ -16,14 +16,14 @@ macro_rules! read_csr {
 #[macro_export]
 macro_rules! write_csr {
     ($csr:literal, $val:expr) => {{
-        asm!(concat!("csrw ", $csr, ", {}"), in(reg) $val);
+        core::arch::asm!(concat!("csrw ", $csr, ", {}"), in(reg) $val);
     }};
 }
 
 #[macro_export]
 macro_rules! write_csr_set {
     ($csr:literal, $val:expr) => {{
-        asm!(concat!("csrs ", $csr, ", {}"), in(reg) $val);
+        core::arch::asm!(concat!("csrs ", $csr, ", {}"), in(reg) $val);
     }};
 }
 
