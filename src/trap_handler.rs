@@ -1,12 +1,14 @@
 use core::{arch::naked_asm, fmt::Write, panic};
 
-use crate::{print, println, read_csr, timer::handle_timer_irq};
+use crate::{constants::SSTATUS_SIE, print, println, read_csr, timer::handle_timer_irq};
 
 #[unsafe(naked)]
 #[repr(align(4))]
 pub unsafe extern "C" fn kernel_entry() {
     naked_asm!(
         "
+        csrc sstatus, {SSTATUS_SIE}
+
         csrrw sp, sscratch, sp
 
         addi sp, sp, -4 * 31
@@ -81,13 +83,17 @@ pub unsafe extern "C" fn kernel_entry() {
         lw s10, 4 * 28(sp)
         lw s11, 4 * 29(sp)
         lw sp,  4 * 30(sp)
+
+        csrs sstatus, {SSTATUS_SIE}
+
         sret
         ",
+        SSTATUS_SIE = const SSTATUS_SIE,
         handle_trap = sym handle_trap,
     );
 }
 
-#[repr(C, packed)]
+#[repr(C)]
 #[derive(Debug)]
 pub struct TrapFrame {
     ra: usize,
