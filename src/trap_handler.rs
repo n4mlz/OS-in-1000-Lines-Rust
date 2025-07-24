@@ -1,6 +1,6 @@
-use core::arch::naked_asm;
+use core::{arch::naked_asm, fmt::Write, panic};
 
-use crate::{read_csr, timer::handle_timer_irq};
+use crate::{print, println, read_csr, timer::handle_timer_irq};
 
 #[unsafe(naked)]
 #[repr(align(4))]
@@ -88,6 +88,7 @@ pub unsafe extern "C" fn kernel_entry() {
 }
 
 #[repr(C, packed)]
+#[derive(Debug)]
 pub struct TrapFrame {
     ra: usize,
     gp: usize,
@@ -126,7 +127,7 @@ enum TrapCause {
     Timer = 5,
 }
 
-fn handle_trap(_: &TrapFrame) {
+fn handle_trap(trap_frame: &TrapFrame) {
     let scause = read_csr!("scause");
     let stval = read_csr!("stval");
     let sepc = read_csr!("sepc");
@@ -139,8 +140,12 @@ fn handle_trap(_: &TrapFrame) {
                 handle_timer_irq();
             }
             _ => {
-                panic!("unexpected trap scause: {scause:x}, stval: {stval:x}, sepc: {sepc:x}");
+                println!("Trap frame: {trap_frame:?}");
+                panic!("unexpected IRQ scause: {scause:x}, stval: {stval:x}, sepc: {sepc:x}");
             }
         }
+    } else {
+        println!("Trap frame: {trap_frame:?}");
+        panic!("unexpected trap scause: {scause:x}, stval: {stval:x}, sepc: {sepc:x}");
     }
 }
