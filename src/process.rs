@@ -119,7 +119,7 @@ impl ProcessManager {
         self.procs[idle_idx].replace(idle_proc);
     }
 
-    pub fn crate_process(&self, pc: usize) -> Option<u32> {
+    pub fn create_process(&self, pc: usize) -> Option<u32> {
         let idx = self
             .procs
             .iter()
