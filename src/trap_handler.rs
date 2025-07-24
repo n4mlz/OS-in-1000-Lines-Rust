@@ -1,6 +1,6 @@
 use core::arch::naked_asm;
 
-use crate::read_csr;
+use crate::{read_csr, timer::handle_timer_irq};
 
 #[unsafe(naked)]
 #[repr(align(4))]
@@ -122,10 +122,21 @@ pub struct TrapFrame {
     sp: usize,
 }
 
+enum TrapCause {
+    Timer = 7,
+}
+
 fn handle_trap(_: &TrapFrame) {
     let scause = read_csr!("scause");
     let stval = read_csr!("stval");
     let sepc = read_csr!("sepc");
 
-    panic!("unexpected trap scause: {scause:x}, stval: {stval:x}, sepc: {sepc:x}");
+    match scause {
+        val if val == TrapCause::Timer as usize => {
+            handle_timer_irq();
+        }
+        _ => {
+            panic!("unexpected trap scause: {scause:x}, stval: {stval:x}, sepc: {sepc:x}");
+        }
+    }
 }

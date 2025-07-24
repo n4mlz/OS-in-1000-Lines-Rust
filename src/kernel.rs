@@ -7,6 +7,7 @@ mod memory;
 mod playground;
 mod process;
 mod sbi;
+mod timer;
 mod trap_handler;
 mod utils;
 
@@ -16,6 +17,7 @@ use crate::{
     constants::{BSS, BSS_END, STACK_TOP},
     memory::alloc_pages,
     process::PM,
+    timer::init_timer,
     trap_handler::kernel_entry,
     utils::Addr,
 };
@@ -42,6 +44,8 @@ fn kernel_main() -> ! {
     }
 
     PM.init();
+
+    init_timer();
 
     println!("Hello, World!");
 
