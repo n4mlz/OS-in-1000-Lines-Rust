@@ -5,7 +5,7 @@ use crate::{constants::TIMER_QUANTUM_US, print, println, sbi::sbi_call, write_cs
 const SBI_EID_TIME: usize = 0x54494d45;
 const SBI_FID_SET_TIMER: usize = 0;
 
-const TIMEBASE_FREQ: u64 = 1_000_000; // 1 MHz
+const TIMEBASE_FREQ: u64 = 10_000_000; // 10 MHz
 
 fn get_time() -> u64 {
     let (mut hi, mut lo, mut tmp): (u32, u32, u32);
