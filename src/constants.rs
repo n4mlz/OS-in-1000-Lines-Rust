@@ -16,6 +16,7 @@ pub static mut FREE_RAM_END: *const u8 = &raw const __free_ram_end;
 
 pub const PAGE_SIZE: usize = 4096;
 
+pub const SSTATUS_SIE: usize = 1 << 1;
 pub const SATP_SV32: usize = 1 << 31;
 
 pub const PAGE_V: u32 = 1 << 0;
