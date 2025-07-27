@@ -11,7 +11,7 @@ pub unsafe extern "C" fn kernel_entry() {
 
         csrrw sp, sscratch, sp
 
-        addi sp, sp, -4 * 31
+        addi sp, sp, -4 * 33
         sw ra,  4 * 0(sp)
         sw gp,  4 * 1(sp)
         sw tp,  4 * 2(sp)
@@ -43,14 +43,26 @@ pub unsafe extern "C" fn kernel_entry() {
         sw s10, 4 * 28(sp)
         sw s11, 4 * 29(sp)
 
-        csrr a0, sscratch
+        csrr a0, sstatus
         sw a0, 4 * 30(sp)
+        csrr a0, sepc
+        sw a0, 4 * 31(sp)
 
-        addi a0, sp, 4 * 31
-        csrw sscratch, a0
+        csrr a0, sscratch
+        sw a0, 4 * 32(sp)
+
+        csrw sscratch, sp
 
         mv a0, sp
         call {handle_trap}
+
+        addi a0, sp, 4 * 33
+        csrw sscratch, a0
+
+        lw a0, 4 * 31(sp)
+        csrw sepc, a0
+        lw a0, 4 * 30(sp)
+        csrw sstatus, a0
 
         lw ra,  4 * 0(sp)
         lw gp,  4 * 1(sp)
@@ -82,7 +94,8 @@ pub unsafe extern "C" fn kernel_entry() {
         lw s9,  4 * 27(sp)
         lw s10, 4 * 28(sp)
         lw s11, 4 * 29(sp)
-        lw sp,  4 * 30(sp)
+
+        lw sp,  4 * 32(sp)
 
         csrs sstatus, {SSTATUS_SIE}
 
@@ -126,6 +139,8 @@ pub struct TrapFrame {
     s9: usize,
     s10: usize,
     s11: usize,
+    sstatus: usize,
+    sepc: usize,
     sp: usize,
 }
 
