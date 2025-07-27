@@ -3,13 +3,13 @@ use core::{arch::naked_asm, fmt::Write, panic};
 use crate::{print, println, read_csr, timer::handle_timer_irq};
 
 #[unsafe(naked)]
-#[repr(align(4))]
+#[repr(align(16))]
 pub unsafe extern "C" fn kernel_entry() {
     naked_asm!(
         "
         csrrw sp, sscratch, sp
 
-        addi sp, sp, -4 * 33
+        addi sp, sp, -4 * 48
         sw ra,  4 * 0(sp)
         sw gp,  4 * 1(sp)
         sw tp,  4 * 2(sp)
@@ -54,7 +54,7 @@ pub unsafe extern "C" fn kernel_entry() {
         mv a0, sp
         call {handle_trap}
 
-        addi a0, sp, 4 * 33
+        addi a0, sp, 4 * 48
         csrw sscratch, a0
 
         lw a0, 4 * 31(sp)
