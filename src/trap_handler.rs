@@ -148,6 +148,9 @@ fn handle_trap(trap_frame: &TrapFrame) {
     let stval = read_csr!("stval");
     let sepc = read_csr!("sepc");
 
+    println!("Trap frame: {trap_frame:x?}");
+    println!("scause: {scause:x}, stval: {stval:x}, sepc: {sepc:x}");
+
     if scause & 1 << 31 != 0 {
         let irq = scause & 0x1f;
 
@@ -156,12 +159,10 @@ fn handle_trap(trap_frame: &TrapFrame) {
                 handle_timer_irq();
             }
             _ => {
-                println!("Trap frame: {trap_frame:?}");
                 panic!("unexpected IRQ scause: {scause:x}, stval: {stval:x}, sepc: {sepc:x}");
             }
         }
     } else {
-        println!("Trap frame: {trap_frame:?}");
         panic!("unexpected trap scause: {scause:x}, stval: {stval:x}, sepc: {sepc:x}");
     }
 }
