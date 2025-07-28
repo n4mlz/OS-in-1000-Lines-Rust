@@ -45,8 +45,6 @@ fn kernel_main() -> ! {
 
     PM.init();
 
-    init_timer();
-
     println!("Hello, World!");
 
     let paddr0 = alloc_pages(2).as_usize();
@@ -57,6 +55,8 @@ fn kernel_main() -> ! {
 
     PM.create_process(playground::proc_a_entry as usize);
     PM.create_process(playground::proc_b_entry as usize);
+
+    init_timer();
 
     PM.switch();
 
