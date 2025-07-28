@@ -1,6 +1,8 @@
 use core::{arch::asm, fmt::Write};
 
-use crate::{constants::TIMER_QUANTUM_US, print, println, sbi::sbi_call, write_csr_set};
+use crate::{
+    constants::TIMER_QUANTUM_US, print, println, sbi::sbi_call, utils::irq_enable, write_csr_set,
+};
 
 const SBI_EID_TIME: usize = 0x54494d45;
 const SBI_FID_SET_TIMER: usize = 0;
@@ -39,7 +41,7 @@ fn set_next_timer() {
 pub fn enable_timer_irq() {
     unsafe {
         write_csr_set!("sie", 1 << 5); // STIE
-        write_csr_set!("sstatus", 1 << 1); // SIE
+        irq_enable();
     }
 }
 
