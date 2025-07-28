@@ -1,7 +1,8 @@
 use core::arch::asm;
 
 use crate::{
-    constants::TIMER_QUANTUM_US, process::PM, sbi::sbi_call, utils::irq_enable, write_csr_set,
+    constants::TIMER_QUANTUM_US, process::PM, read_csr, sbi::sbi_call, utils::irq_enable,
+    write_csr_set,
 };
 
 const SBI_EID_TIME: usize = 0x54494d45;
@@ -43,6 +44,11 @@ pub fn enable_timer_irq() {
         write_csr_set!("sie", 1 << 5); // STIE
         irq_enable();
     }
+}
+
+pub fn is_enabled_timer_irq() -> bool {
+    let sie = read_csr!("sie");
+    (sie & (1 << 5)) != 0
 }
 
 pub fn init_timer() {
