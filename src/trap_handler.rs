@@ -1,6 +1,6 @@
-use core::{arch::naked_asm, fmt::Write, panic};
+use core::{arch::naked_asm, panic};
 
-use crate::{print, println, read_csr, timer::handle_timer_irq};
+use crate::{read_csr, timer::handle_timer_irq};
 
 #[unsafe(naked)]
 #[repr(align(16))]
