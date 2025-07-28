@@ -64,7 +64,8 @@ struct Process {
     state: State,
     page_table: PhysAddr,
     context: Context,
-    stack: [u8; KERNEL_STACK_SIZE],
+    sscratch: [usize; 2],
+    stack: [usize; KERNEL_STACK_SIZE],
 }
 
 impl Process {
@@ -74,6 +75,7 @@ impl Process {
             state: State::Unused,
             page_table: PhysAddr::NULL,
             context: Context::new(),
+            sscratch: [0; 2],
             stack: [0; KERNEL_STACK_SIZE],
         }
     }
@@ -115,6 +117,7 @@ impl ProcessManager {
         idle_proc.pid = 0;
         idle_proc.state = State::Runnable;
         idle_proc.page_table = page_table;
+        idle_proc.sscratch = [0, idle_proc.stack.as_ptr() as usize + KERNEL_STACK_SIZE];
 
         self.procs[idle_idx].replace(idle_proc);
     }
@@ -144,6 +147,7 @@ impl ProcessManager {
         proc.page_table = page_table;
         proc.context.ra = pc;
         proc.context.sp = proc.stack.as_ptr() as usize + KERNEL_STACK_SIZE;
+        proc.sscratch = [0, proc.stack.as_ptr() as usize + KERNEL_STACK_SIZE];
 
         Some(proc.pid)
     }
@@ -215,7 +219,7 @@ impl ProcessManager {
         let current_context = &mut current_proc.context as *mut Context;
         let next_context = &next_proc.context as *const Context;
 
-        let next_stack_top = next_proc.stack.as_ptr() as usize + KERNEL_STACK_SIZE;
+        let next_sscratch = &next_proc.sscratch;
 
         unsafe {
             asm!("
@@ -225,7 +229,7 @@ impl ProcessManager {
             csrw sscratch, {sscratch}
             ",
             satp = in(reg) SATP_SV32 | (next_proc.page_table.as_usize() / PAGE_SIZE),
-            sscratch = in(reg) next_stack_top,
+            sscratch = in(reg) next_sscratch,
             );
         }
 
