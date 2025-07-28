@@ -7,9 +7,55 @@ use crate::{print, println, read_csr, timer::handle_timer_irq};
 pub unsafe extern "C" fn kernel_entry() {
     naked_asm!(
         "
+        // この時点で sp: usp, sscratch: sscratch[]
+
         csrrw sp, sscratch, sp
 
-        addi sp, sp, -4 * 48
+        // この時点で sp: sscratch[], sscratch: usp
+
+        sw a0, 4 * 0(sp)
+
+        // この時点で sp: sscratch[], sscratch: usp, sscratch[0]: a0
+
+        csrr a0, sstatus
+        andi a0, a0, (1 << 8)
+        bnez a0, 1f
+
+        // from U-Mode
+        lw a0, 4 * 1(sp)
+        csrrw sp, sscratch, sp
+
+        // この時点で sp: usp, sscratch: sscratch[], sscratch[0]: a0, a0: sscratch[1] (kernel stack)
+
+        j 2f
+
+        1:
+        // from S-Mode
+        csrrw sp, sscratch, sp
+        addi a0, sp, 0
+
+        // この時点で sp: usp, sscratch: sscratch[], sscratch[0]: a0, a0: usp (kernel stack)
+
+        2:
+
+        addi a0, a0, -4 * 48
+
+        sw sp, 4 * 32(a0)
+
+        // この時点で sp: (捨てて良い), sscratch: sscratch[], sscratch[0]: a0, a0: kernel stack -4 * 48
+
+        csrrw sp, sscratch, a0
+
+        // この時点で sp: sscratch[], sscratch: kernel stack -4 * 48, sscratch[0]: a0, a0: (捨てて良い)
+
+        lw a0, 4 * 0(sp)
+
+        // この時点で sp: sscratch[], sscratch: kernel stack -4 * 48, sscratch[0]: a0, a0: a0
+
+        csrrw sp, sscratch, sp
+
+        // この時点で sp: kernel stack -4 * 48, sscratch: sscratch[], sscratch[0]: a0, a0: a0
+
         sw ra,  4 * 0(sp)
         sw gp,  4 * 1(sp)
         sw tp,  4 * 2(sp)
@@ -46,16 +92,10 @@ pub unsafe extern "C" fn kernel_entry() {
         csrr a0, sepc
         sw a0, 4 * 31(sp)
 
-        csrr a0, sscratch
-        sw a0, 4 * 32(sp)
-
-        csrw sscratch, sp
+        // この時点で sp: kernel stack -4 * 48, sscratch: sscratch[], a0: (捨てて良い)
 
         mv a0, sp
         call {handle_trap}
-
-        addi a0, sp, 4 * 48
-        csrw sscratch, a0
 
         lw a0, 4 * 31(sp)
         csrw sepc, a0
@@ -101,7 +141,7 @@ pub unsafe extern "C" fn kernel_entry() {
     );
 }
 
-#[repr(C)]
+#[repr(C, packed)]
 #[derive(Debug)]
 pub struct TrapFrame {
     ra: usize,
