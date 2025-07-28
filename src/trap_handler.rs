@@ -1,15 +1,39 @@
-use core::arch::naked_asm;
+use core::{arch::naked_asm, fmt::Write, panic};
 
-use crate::read_csr;
+use crate::{print, println, read_csr, timer::handle_timer_irq};
 
 #[unsafe(naked)]
-#[repr(align(4))]
+#[repr(align(16))]
 pub unsafe extern "C" fn kernel_entry() {
     naked_asm!(
         "
         csrrw sp, sscratch, sp
 
-        addi sp, sp, -4 * 31
+        sw a0, 4 * 0(sp)
+
+        csrr a0, sstatus
+        andi a0, a0, (1 << 8)
+        bnez a0, 1f
+
+        // from U-Mode
+        lw a0, 4 * 1(sp)
+        csrrw sp, sscratch, sp
+        j 2f
+
+        1:
+        // from S-Mode
+        csrrw sp, sscratch, sp
+        addi a0, sp, 0
+
+        2:
+        addi a0, a0, -4 * 48
+
+        sw sp, 4 * 32(a0)
+        csrrw sp, sscratch, a0
+        lw a0, 4 * 0(sp)
+
+        csrrw sp, sscratch, sp
+
         sw ra,  4 * 0(sp)
         sw gp,  4 * 1(sp)
         sw tp,  4 * 2(sp)
@@ -41,14 +65,18 @@ pub unsafe extern "C" fn kernel_entry() {
         sw s10, 4 * 28(sp)
         sw s11, 4 * 29(sp)
 
-        csrr a0, sscratch
+        csrr a0, sstatus
         sw a0, 4 * 30(sp)
-
-        addi a0, sp, 4 * 31
-        csrw sscratch, a0
+        csrr a0, sepc
+        sw a0, 4 * 31(sp)
 
         mv a0, sp
         call {handle_trap}
+
+        lw a0, 4 * 31(sp)
+        csrw sepc, a0
+        lw a0, 4 * 30(sp)
+        csrw sstatus, a0
 
         lw ra,  4 * 0(sp)
         lw gp,  4 * 1(sp)
@@ -80,7 +108,9 @@ pub unsafe extern "C" fn kernel_entry() {
         lw s9,  4 * 27(sp)
         lw s10, 4 * 28(sp)
         lw s11, 4 * 29(sp)
-        lw sp,  4 * 30(sp)
+
+        lw sp,  4 * 32(sp)
+
         sret
         ",
         handle_trap = sym handle_trap,
@@ -88,6 +118,7 @@ pub unsafe extern "C" fn kernel_entry() {
 }
 
 #[repr(C, packed)]
+#[derive(Debug)]
 pub struct TrapFrame {
     ra: usize,
     gp: usize,
@@ -119,7 +150,13 @@ pub struct TrapFrame {
     s9: usize,
     s10: usize,
     s11: usize,
+    sstatus: usize,
+    sepc: usize,
     sp: usize,
+}
+
+enum TrapCause {
+    Timer = 5,
 }
 
 fn handle_trap(_: &TrapFrame) {
@@ -127,5 +164,18 @@ fn handle_trap(_: &TrapFrame) {
     let stval = read_csr!("stval");
     let sepc = read_csr!("sepc");
 
-    panic!("unexpected trap scause: {scause:x}, stval: {stval:x}, sepc: {sepc:x}");
+    if scause & 1 << 31 != 0 {
+        let irq = scause & 0x1f;
+
+        match irq {
+            val if val == TrapCause::Timer as usize => {
+                handle_timer_irq();
+            }
+            _ => {
+                panic!("unexpected IRQ scause: {scause:x}, stval: {stval:x}, sepc: {sepc:x}");
+            }
+        }
+    } else {
+        panic!("unexpected trap scause: {scause:x}, stval: {stval:x}, sepc: {sepc:x}");
+    }
 }

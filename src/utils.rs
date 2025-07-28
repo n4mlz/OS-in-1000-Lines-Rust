@@ -1,6 +1,6 @@
 use core::fmt::{self, Write};
 
-use crate::sbi::sbi_call;
+use crate::{constants::SSTATUS_SIE, sbi::sbi_call};
 
 #[macro_export]
 macro_rules! read_csr {
@@ -16,8 +16,34 @@ macro_rules! read_csr {
 #[macro_export]
 macro_rules! write_csr {
     ($csr:literal, $val:expr) => {{
-        asm!(concat!("csrw ", $csr, ", {}"), in(reg) $val);
+        core::arch::asm!(concat!("csrw ", $csr, ", {}"), in(reg) $val);
     }};
+}
+
+#[macro_export]
+macro_rules! write_csr_set {
+    ($csr:literal, $val:expr) => {{
+        core::arch::asm!(concat!("csrs ", $csr, ", {}"), in(reg) $val);
+    }};
+}
+
+#[macro_export]
+macro_rules! write_csr_clear {
+    ($csr:literal, $val:expr) => {{
+        core::arch::asm!(concat!("csrc ", $csr, ", {}"), in(reg) $val);
+    }};
+}
+
+pub fn irq_enable() {
+    unsafe {
+        write_csr_set!("sstatus", SSTATUS_SIE);
+    }
+}
+
+pub fn irq_disable() {
+    unsafe {
+        write_csr_clear!("sstatus", SSTATUS_SIE);
+    }
 }
 
 pub fn putchar(c: u8) -> Result<(), isize> {

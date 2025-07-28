@@ -11,14 +11,14 @@ pub fn sbi_call(
     fid: usize,
     eid: usize,
 ) -> Result<usize, isize> {
-    let mut err: isize;
-    let mut value: usize;
+    let err: isize;
+    let value: usize;
 
     unsafe {
         asm!(
             "ecall",
-            inout("a0") arg0 => err,
-            inout("a1") arg1 => value,
+            inlateout("a0") arg0 => err,
+            inlateout("a1") arg1 => value,
             in("a2") arg2,
             in("a3") arg3,
             in("a4") arg4,

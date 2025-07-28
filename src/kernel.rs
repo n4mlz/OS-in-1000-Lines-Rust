@@ -7,6 +7,7 @@ mod memory;
 mod playground;
 mod process;
 mod sbi;
+mod timer;
 mod trap_handler;
 mod utils;
 
@@ -16,6 +17,7 @@ use crate::{
     constants::{BSS, BSS_END, STACK_TOP},
     memory::alloc_pages,
     process::PM,
+    timer::init_timer,
     trap_handler::kernel_entry,
     utils::Addr,
 };
@@ -43,6 +45,8 @@ fn kernel_main() -> ! {
 
     PM.init();
 
+    init_timer();
+
     println!("Hello, World!");
 
     let paddr0 = alloc_pages(2).as_usize();
@@ -51,8 +55,8 @@ fn kernel_main() -> ! {
     println!("alloc_pages test: paddr0 = {paddr0:x}");
     println!("alloc_pages test: paddr1 = {paddr1:x}");
 
-    PM.crate_process(playground::proc_a_entry as usize);
-    PM.crate_process(playground::proc_b_entry as usize);
+    PM.create_process(playground::proc_a_entry as usize);
+    PM.create_process(playground::proc_b_entry as usize);
 
     PM.switch();
 
