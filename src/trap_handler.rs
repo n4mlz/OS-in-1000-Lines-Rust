@@ -7,15 +7,9 @@ use crate::{print, println, read_csr, timer::handle_timer_irq};
 pub unsafe extern "C" fn kernel_entry() {
     naked_asm!(
         "
-        // この時点で sp: usp, sscratch: sscratch[]
-
         csrrw sp, sscratch, sp
 
-        // この時点で sp: sscratch[], sscratch: usp
-
         sw a0, 4 * 0(sp)
-
-        // この時点で sp: sscratch[], sscratch: usp, sscratch[0]: a0
 
         csrr a0, sstatus
         andi a0, a0, (1 << 8)
@@ -24,9 +18,6 @@ pub unsafe extern "C" fn kernel_entry() {
         // from U-Mode
         lw a0, 4 * 1(sp)
         csrrw sp, sscratch, sp
-
-        // この時点で sp: usp, sscratch: sscratch[], sscratch[0]: a0, a0: sscratch[1] (kernel stack)
-
         j 2f
 
         1:
@@ -34,27 +25,14 @@ pub unsafe extern "C" fn kernel_entry() {
         csrrw sp, sscratch, sp
         addi a0, sp, 0
 
-        // この時点で sp: usp, sscratch: sscratch[], sscratch[0]: a0, a0: usp (kernel stack)
-
         2:
-
         addi a0, a0, -4 * 48
 
         sw sp, 4 * 32(a0)
-
-        // この時点で sp: (捨てて良い), sscratch: sscratch[], sscratch[0]: a0, a0: kernel stack -4 * 48
-
         csrrw sp, sscratch, a0
-
-        // この時点で sp: sscratch[], sscratch: kernel stack -4 * 48, sscratch[0]: a0, a0: (捨てて良い)
-
         lw a0, 4 * 0(sp)
 
-        // この時点で sp: sscratch[], sscratch: kernel stack -4 * 48, sscratch[0]: a0, a0: a0
-
         csrrw sp, sscratch, sp
-
-        // この時点で sp: kernel stack -4 * 48, sscratch: sscratch[], sscratch[0]: a0, a0: a0
 
         sw ra,  4 * 0(sp)
         sw gp,  4 * 1(sp)
@@ -91,8 +69,6 @@ pub unsafe extern "C" fn kernel_entry() {
         sw a0, 4 * 30(sp)
         csrr a0, sepc
         sw a0, 4 * 31(sp)
-
-        // この時点で sp: kernel stack -4 * 48, sscratch: sscratch[], a0: (捨てて良い)
 
         mv a0, sp
         call {handle_trap}
@@ -183,13 +159,10 @@ enum TrapCause {
     Timer = 5,
 }
 
-fn handle_trap(trap_frame: &TrapFrame) {
+fn handle_trap(_: &TrapFrame) {
     let scause = read_csr!("scause");
     let stval = read_csr!("stval");
     let sepc = read_csr!("sepc");
-
-    println!("Trap frame: {trap_frame:x?}");
-    println!("scause: {scause:x}, stval: {stval:x}, sepc: {sepc:x}");
 
     if scause & 1 << 31 != 0 {
         let irq = scause & 0x1f;
