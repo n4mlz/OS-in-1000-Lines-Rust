@@ -5,7 +5,26 @@ use crate::process::{PM, State};
 #[derive(Clone, Copy, Debug)]
 pub enum Message {
     Ping,
-    Data { a: usize, b: usize },
+    Data {
+        a: usize,
+        b: usize,
+    },
+
+    DisplayPrint {
+        display: u8, // 0..3
+        line: u8,
+        text: [u8; 32],
+        len: u8,
+    },
+    DisplayClear(u8), // 0..3
+    DisplayDrawCell {
+        display: u8,
+        x: u8,
+        y: u8,
+        fg: u8,
+        bg: u8,
+        ch: char,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -73,6 +92,7 @@ impl Ipc {
             }
         }
 
+        let mut should_unblock = false;
         {
             let mut dst_proc = PM.procs[dst_idx].borrow_mut();
             if dst_proc.state == State::Blocked
@@ -82,18 +102,20 @@ impl Ipc {
                     Src::Specific(p) if p == me => {
                         dst_proc.ipc.inbox = Some(msg);
                         dst_proc.ipc.waiting_for = None;
-                        PM.unblock(dst);
-                        return Ok(());
+                        should_unblock = true;
                     }
                     Src::Any => {
                         dst_proc.ipc.inbox = Some(msg);
                         dst_proc.ipc.waiting_for = None;
-                        PM.unblock(dst);
-                        return Ok(());
+                        should_unblock = true;
                     }
                     _ => {}
                 }
             }
+        }
+        if should_unblock {
+            PM.unblock(dst);
+            return Ok(());
         }
 
         {
@@ -135,70 +157,99 @@ impl Ipc {
 
         Ok(())
     }
-
     pub fn recv(src: Src) -> Result<Message, IpcError> {
         let me = PM.current_pid();
         let me_idx = me.as_usize();
 
-        {
-            {
-                let mut me_proc = PM.procs[me_idx].borrow_mut();
-                if let Src::Specific(sender) = src {
-                    if let Some(pos) = me_proc.ipc.senders.iter().position(|slot| match slot {
-                        Some(entry) => entry.src == sender,
-                        None => false,
-                    }) && let Some(entry) = me_proc.ipc.senders[pos].take()
-                    {
+        if let Some((msg, sender)) = {
+            let mut me_proc = PM.procs[me_idx].borrow_mut();
+
+            if let Src::Specific(expected) = src {
+                if let Some(pos) = me_proc
+                    .ipc
+                    .senders
+                    .iter()
+                    .position(|slot| matches!(slot, Some(entry) if entry.src == expected))
+                {
+                    if let Some(entry) = me_proc.ipc.senders[pos].take() {
                         {
                             let mut sender_proc = PM.procs[entry.src.as_usize()].borrow_mut();
                             sender_proc.ipc.pending_send = None;
                         }
-                        PM.unblock(entry.src);
-                        return Ok(entry.msg);
+                        me_proc.ipc.waiting_for = None;
+                        Some((entry.msg, entry.src))
+                    } else {
+                        None
                     }
-                } else if let Some(pos) = me_proc.ipc.senders.iter().position(|s| s.is_some())
-                    && let Some(entry) = me_proc.ipc.senders[pos].take()
-                {
+                } else {
+                    None
+                }
+            } else if let Some(pos) = me_proc.ipc.senders.iter().position(|s| s.is_some()) {
+                if let Some(entry) = me_proc.ipc.senders[pos].take() {
                     {
                         let mut sender_proc = PM.procs[entry.src.as_usize()].borrow_mut();
                         sender_proc.ipc.pending_send = None;
                     }
-                    PM.unblock(entry.src);
-                    return Ok(entry.msg);
+                    me_proc.ipc.waiting_for = None;
+                    Some((entry.msg, entry.src))
+                } else {
+                    None
                 }
-
-                if let Some(msg) = me_proc.ipc.inbox.take() {
-                    return Ok(msg);
-                }
-
-                if me_proc.ipc.waiting_for.is_some() {
-                    return Err(IpcError::DeadlockDetected);
-                }
-                me_proc.ipc.waiting_for = Some(src);
+            } else if let Some(msg) = me_proc.ipc.inbox.take() {
+                return Ok(msg);
+            } else {
+                None
             }
-            PM.block_current();
+        } {
+            PM.unblock(sender);
+            return Ok(msg);
         }
 
+        {
+            let mut me_proc = PM.procs[me_idx].borrow_mut();
+            if me_proc.ipc.waiting_for.is_some() {
+                return Err(IpcError::DeadlockDetected);
+            }
+            me_proc.ipc.waiting_for = Some(src);
+        }
+        PM.block_current();
         PM.switch();
 
         {
             let mut me_proc = PM.procs[me_idx].borrow_mut();
+
             if let Some(msg) = me_proc.ipc.inbox.take() {
+                me_proc.ipc.waiting_for = None;
                 return Ok(msg);
             }
-            if let Some(Src::Specific(sender)) = me_proc.ipc.waiting_for
-                && let Some(pos) = me_proc.ipc.senders.iter().position(|slot| match slot {
-                    Some(entry) => entry.src == sender,
-                    None => false,
-                })
+
+            if let Some(Src::Specific(expected)) = me_proc.ipc.waiting_for
+                && let Some(pos) = me_proc
+                    .ipc
+                    .senders
+                    .iter()
+                    .position(|slot| matches!(slot, Some(entry) if entry.src == expected))
                 && let Some(entry) = me_proc.ipc.senders[pos].take()
             {
                 {
                     let mut sender_proc = PM.procs[entry.src.as_usize()].borrow_mut();
                     sender_proc.ipc.pending_send = None;
                 }
-                PM.unblock(entry.src);
                 me_proc.ipc.waiting_for = None;
+                PM.unblock(entry.src);
+                return Ok(entry.msg);
+            }
+
+            if matches!(me_proc.ipc.waiting_for, Some(Src::Any))
+                && let Some(pos) = me_proc.ipc.senders.iter().position(|s| s.is_some())
+                && let Some(entry) = me_proc.ipc.senders[pos].take()
+            {
+                {
+                    let mut sender_proc = PM.procs[entry.src.as_usize()].borrow_mut();
+                    sender_proc.ipc.pending_send = None;
+                }
+                me_proc.ipc.waiting_for = None;
+                PM.unblock(entry.src);
                 return Ok(entry.msg);
             }
         }
