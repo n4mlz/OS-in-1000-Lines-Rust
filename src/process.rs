@@ -310,13 +310,6 @@ impl ProcessManager {
         }
     }
 
-    pub fn state(&self, pid: Pid) -> State {
-        if pid.is_idle() {
-            return State::Runnable;
-        }
-        self.procs[pid.as_usize()].borrow().state
-    }
-
     pub fn unblock(&self, pid: Pid) {
         if pid.is_idle() {
             return;
