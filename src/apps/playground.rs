@@ -4,7 +4,7 @@ use crate::ipc::{Ipc, Message, Src};
 use crate::process::{PM, Pid};
 use crate::{print, println};
 
-pub fn proc_a_entry() -> ! {
+pub fn proc_a() -> ! {
     let target = Pid::new(2);
     println!("A: sending Data to B");
     let data = Message::Data { a: 100, b: 200 };
@@ -30,7 +30,7 @@ pub fn proc_a_entry() -> ! {
     }
 }
 
-pub fn proc_b_entry() -> ! {
+pub fn proc_b() -> ! {
     let source = Pid::new(1);
     println!("B: waiting for Data from A");
     match Ipc::recv(Src::Specific(source)) {
