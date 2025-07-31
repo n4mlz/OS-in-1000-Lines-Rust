@@ -8,12 +8,13 @@ use crate::{
         FREE_RAM_END, KERNEL_BASE, KERNEL_STACK_SIZE, PAGE_R, PAGE_SIZE, PAGE_W, PAGE_X, PROCS_MAX,
         SATP_SV32,
     },
+    ipc::Ipc,
     memory::{alloc_pages, map_page},
     utils::{Addr, PhysAddr, VirtAddr},
 };
 
 #[derive(Clone, Copy, PartialEq)]
-enum State {
+pub enum State {
     Unused,
     Blocked,
     Runnable,
@@ -59,7 +60,7 @@ impl Context {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Pid(usize);
 
 impl Pid {
@@ -81,13 +82,14 @@ impl Pid {
 }
 
 #[derive(Clone, Copy)]
-struct Process {
-    pid: Pid,
-    state: State,
+pub struct Process {
+    pub pid: Pid,
+    pub state: State,
     page_table: PhysAddr,
     context: Context,
     sscratch: [usize; 2],
     stack: [usize; KERNEL_STACK_SIZE],
+    pub ipc: Ipc,
 }
 
 impl Process {
@@ -99,6 +101,7 @@ impl Process {
             context: Context::new(),
             sscratch: [0; 2],
             stack: [0; KERNEL_STACK_SIZE],
+            ipc: Ipc::new(),
         }
     }
 }
@@ -141,8 +144,8 @@ impl RunQueue {
 }
 
 pub struct ProcessManager {
-    procs: [RefCell<Process>; PROCS_MAX],
-    current: RefCell<Pid>,
+    pub procs: [RefCell<Process>; PROCS_MAX],
+    pub current: RefCell<Pid>,
     run_queue: RunQueue,
 }
 
