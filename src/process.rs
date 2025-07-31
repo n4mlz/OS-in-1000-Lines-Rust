@@ -98,6 +98,12 @@ impl RunQueue {
     }
 
     fn enqueue(&self, pid: usize) {
+        let idle_pid = 0;
+
+        if pid == idle_pid {
+            return;
+        }
+
         let tail = *self.tail.borrow();
         self.queue.borrow_mut()[tail] = pid;
         *self.tail.borrow_mut() = (tail + 1) % PROCS_MAX;
@@ -185,22 +191,25 @@ impl ProcessManager {
         proc.context.sp = proc.stack.as_ptr() as usize + KERNEL_STACK_SIZE;
         proc.sscratch = [0, proc.stack.as_ptr() as usize + KERNEL_STACK_SIZE];
 
+        self.run_queue.enqueue(proc.pid);
+
         Some(proc.pid)
     }
 
     fn scheduler(&self) -> usize {
         let idle_pid = 0;
 
-        let current = self.current.borrow();
+        let next = self.run_queue.dequeue();
+        if let Some(pid) = next {
+            return pid;
+        }
 
-        self.procs
-            .iter()
-            .enumerate()
-            .find(|&(i, proc)| {
-                i != *current && proc.borrow().pid != 0 && proc.borrow().state == State::Runnable
-            })
-            .map(|(i, _)| i)
-            .unwrap_or(idle_pid)
+        let current = *self.current.borrow();
+        if self.procs[current].borrow().state == State::Runnable {
+            return current;
+        }
+
+        idle_pid
     }
 
     #[unsafe(naked)]
@@ -254,6 +263,10 @@ impl ProcessManager {
         let mut current_proc = self.procs[*current].borrow_mut();
         let next_proc = self.procs[next].borrow();
 
+        if current_proc.state == State::Runnable {
+            self.run_queue.enqueue(*current);
+        }
+
         *current = next;
 
         let current_context = &mut current_proc.context as *mut Context;
@@ -282,18 +295,15 @@ impl ProcessManager {
         }
     }
 
-    fn block(&self, pid: usize) {
-        if pid == 0 {
-            return;
-        }
-
-        let mut proc = self.procs[pid].borrow_mut();
+    pub fn block_current(&self) {
+        let current = *self.current.borrow();
+        let mut proc = self.procs[current].borrow_mut();
         if proc.state == State::Runnable {
             proc.state = State::Blocked;
         }
     }
 
-    fn unblock(&self, pid: usize) {
+    pub fn unblock(&self, pid: usize) {
         if pid == 0 {
             return;
         }
