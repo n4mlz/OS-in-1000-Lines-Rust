@@ -1,7 +1,10 @@
 use core::arch::asm;
 use core::fmt::Write;
 
-use crate::{print, println, process::PM};
+use crate::{
+    print, println,
+    process::{PM, Pid},
+};
 
 pub fn proc_a_entry() {
     loop {
@@ -63,7 +66,7 @@ pub fn proc_b_entry() {
         }
         println!("B");
         println!("unblock A");
-        PM.unblock(1);
+        PM.unblock(Pid::new(1));
         PM.switch();
         for _ in 0..1000000 {
             unsafe {
