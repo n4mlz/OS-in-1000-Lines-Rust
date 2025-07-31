@@ -155,6 +155,10 @@ impl ProcessManager {
         }
     }
 
+    pub fn current_pid(&self) -> Pid {
+        *self.current.borrow()
+    }
+
     pub fn init(&self) {
         let idle_pid = Pid::idle();
 
@@ -297,11 +301,17 @@ impl ProcessManager {
     }
 
     pub fn block_current(&self) {
-        let current = *self.current.borrow();
-        let mut proc = self.procs[current.as_usize()].borrow_mut();
+        let mut proc = self.procs[self.current_pid().as_usize()].borrow_mut();
         if proc.state == State::Runnable {
             proc.state = State::Blocked;
         }
+    }
+
+    pub fn state(&self, pid: Pid) -> State {
+        if pid.is_idle() {
+            return State::Runnable;
+        }
+        self.procs[pid.as_usize()].borrow().state
     }
 
     pub fn unblock(&self, pid: Pid) {
@@ -322,7 +332,7 @@ impl ProcessManager {
             return pid;
         }
 
-        let current = *self.current.borrow();
+        let current = self.current_pid();
         if self.procs[current.as_usize()].borrow().state == State::Runnable {
             return current;
         }
