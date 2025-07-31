@@ -61,7 +61,7 @@ impl Context {
 
 #[derive(Clone, Copy)]
 struct Process {
-    pid: u32,
+    pid: usize,
     state: State,
     page_table: PhysAddr,
     context: Context,
@@ -123,17 +123,17 @@ pub struct ProcessManager {
 
 impl ProcessManager {
     pub const fn new() -> Self {
-        let idle_idx = 0;
+        let idle_pid = 0;
 
         ProcessManager {
             procs: [const { RefCell::new(Process::new()) }; PROCS_MAX],
-            current: RefCell::new(idle_idx),
+            current: RefCell::new(idle_pid),
             run_queue: RunQueue::new(),
         }
     }
 
     pub fn init(&self) {
-        let idle_idx = 0;
+        let idle_pid = 0;
 
         let mut idle_proc = Process::new();
 
@@ -155,10 +155,10 @@ impl ProcessManager {
         idle_proc.page_table = page_table;
         idle_proc.sscratch = [0, idle_proc.stack.as_ptr() as usize + KERNEL_STACK_SIZE];
 
-        self.procs[idle_idx].replace(idle_proc);
+        self.procs[idle_pid].replace(idle_proc);
     }
 
-    pub fn create_process(&self, pc: usize) -> Option<u32> {
+    pub fn create_process(&self, pc: usize) -> Option<usize> {
         let idx = self
             .procs
             .iter()
@@ -178,7 +178,7 @@ impl ProcessManager {
             paddr = unsafe { paddr.add(PAGE_SIZE) };
         }
 
-        proc.pid = idx as u32;
+        proc.pid = idx;
         proc.state = State::Runnable;
         proc.page_table = page_table;
         proc.context.ra = pc;
@@ -189,7 +189,7 @@ impl ProcessManager {
     }
 
     fn scheduler(&self) -> usize {
-        let idle_idx = 0;
+        let idle_pid = 0;
 
         let current = self.current.borrow();
 
@@ -200,7 +200,7 @@ impl ProcessManager {
                 i != *current && proc.borrow().pid != 0 && proc.borrow().state == State::Runnable
             })
             .map(|(i, _)| i)
-            .unwrap_or(idle_idx)
+            .unwrap_or(idle_pid)
     }
 
     #[unsafe(naked)]
