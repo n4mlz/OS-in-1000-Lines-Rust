@@ -15,6 +15,7 @@ use crate::{
 #[derive(Clone, Copy, PartialEq)]
 enum State {
     Unused,
+    Blocked,
     Runnable,
 }
 
@@ -278,6 +279,29 @@ impl ProcessManager {
 
         unsafe {
             Self::switch_context(current_context, next_context);
+        }
+    }
+
+    fn block(&self, pid: usize) {
+        if pid == 0 {
+            return;
+        }
+
+        let mut proc = self.procs[pid].borrow_mut();
+        if proc.state == State::Runnable {
+            proc.state = State::Blocked;
+        }
+    }
+
+    fn unblock(&self, pid: usize) {
+        if pid == 0 {
+            return;
+        }
+
+        let mut proc = self.procs[pid].borrow_mut();
+        if proc.state == State::Blocked {
+            proc.state = State::Runnable;
+            self.run_queue.enqueue(pid);
         }
     }
 }
