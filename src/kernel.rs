@@ -3,6 +3,7 @@
 #![feature(fn_align, pointer_is_aligned_to)]
 
 mod constants;
+mod ipc;
 mod memory;
 mod playground;
 mod process;
