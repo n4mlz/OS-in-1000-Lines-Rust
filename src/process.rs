@@ -177,7 +177,7 @@ impl ProcessManager {
             paddr = unsafe { paddr.add(PAGE_SIZE) };
         }
 
-        proc.pid = idx as u32 + 1;
+        proc.pid = idx as u32;
         proc.state = State::Runnable;
         proc.page_table = page_table;
         proc.context.ra = pc;
