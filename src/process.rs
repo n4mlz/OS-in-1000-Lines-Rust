@@ -196,22 +196,6 @@ impl ProcessManager {
         Some(proc.pid)
     }
 
-    fn scheduler(&self) -> usize {
-        let idle_pid = 0;
-
-        let next = self.run_queue.dequeue();
-        if let Some(pid) = next {
-            return pid;
-        }
-
-        let current = *self.current.borrow();
-        if self.procs[current].borrow().state == State::Runnable {
-            return current;
-        }
-
-        idle_pid
-    }
-
     #[unsafe(naked)]
     #[repr(align(4))]
     unsafe extern "C" fn switch_context(old: *mut Context, new: *const Context) {
@@ -313,6 +297,22 @@ impl ProcessManager {
             proc.state = State::Runnable;
             self.run_queue.enqueue(pid);
         }
+    }
+
+    fn scheduler(&self) -> usize {
+        let idle_pid = 0;
+
+        let next = self.run_queue.dequeue();
+        if let Some(pid) = next {
+            return pid;
+        }
+
+        let current = *self.current.borrow();
+        if self.procs[current].borrow().state == State::Runnable {
+            return current;
+        }
+
+        idle_pid
     }
 }
 
