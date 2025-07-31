@@ -12,12 +12,58 @@ pub fn proc_a_entry() {
                 asm!("nop");
             }
         }
+        println!("A");
+        PM.switch();
+        for _ in 0..1000000 {
+            unsafe {
+                asm!("nop");
+            }
+        }
+        println!("A");
+        println!("block A");
+        PM.block_current();
+        PM.switch();
+        for _ in 0..1000000 {
+            unsafe {
+                asm!("nop");
+            }
+        }
     }
 }
 
 pub fn proc_b_entry() {
     loop {
         println!("B");
+        PM.switch();
+        for _ in 0..1000000 {
+            unsafe {
+                asm!("nop");
+            }
+        }
+        println!("B");
+        PM.switch();
+        for _ in 0..1000000 {
+            unsafe {
+                asm!("nop");
+            }
+        }
+        println!("B");
+        PM.switch();
+        for _ in 0..1000000 {
+            unsafe {
+                asm!("nop");
+            }
+        }
+        println!("B");
+        PM.switch();
+        for _ in 0..1000000 {
+            unsafe {
+                asm!("nop");
+            }
+        }
+        println!("B");
+        println!("unblock A");
+        PM.unblock(1);
         PM.switch();
         for _ in 0..1000000 {
             unsafe {
