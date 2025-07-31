@@ -81,9 +81,43 @@ impl Process {
     }
 }
 
+struct RunQueue {
+    queue: RefCell<[usize; PROCS_MAX]>,
+    head: RefCell<usize>,
+    tail: RefCell<usize>,
+}
+
+impl RunQueue {
+    const fn new() -> Self {
+        RunQueue {
+            queue: RefCell::new([0; PROCS_MAX]),
+            head: RefCell::new(0),
+            tail: RefCell::new(0),
+        }
+    }
+
+    fn enqueue(&self, pid: usize) {
+        let tail = *self.tail.borrow();
+        self.queue.borrow_mut()[tail] = pid;
+        *self.tail.borrow_mut() = (tail + 1) % PROCS_MAX;
+    }
+
+    fn dequeue(&self) -> Option<usize> {
+        if *self.head.borrow() == *self.tail.borrow() {
+            None
+        } else {
+            let head = *self.head.borrow();
+            let pid = self.queue.borrow()[head];
+            *self.head.borrow_mut() = (head + 1) % PROCS_MAX;
+            Some(pid)
+        }
+    }
+}
+
 pub struct ProcessManager {
     procs: [RefCell<Process>; PROCS_MAX],
     current: RefCell<usize>,
+    run_queue: RunQueue,
 }
 
 impl ProcessManager {
@@ -93,6 +127,7 @@ impl ProcessManager {
         ProcessManager {
             procs: [const { RefCell::new(Process::new()) }; PROCS_MAX],
             current: RefCell::new(idle_idx),
+            run_queue: RunQueue::new(),
         }
     }
 
