@@ -152,6 +152,21 @@ impl ProcessManager {
         Some(proc.pid)
     }
 
+    fn scheduler(&self) -> usize {
+        let idle_idx = 0;
+
+        let current = self.current.borrow();
+
+        self.procs
+            .iter()
+            .enumerate()
+            .find(|&(i, proc)| {
+                i != *current && proc.borrow().pid != 0 && proc.borrow().state == State::Runnable
+            })
+            .map(|(i, _)| i)
+            .unwrap_or(idle_idx)
+    }
+
     #[unsafe(naked)]
     #[repr(align(4))]
     unsafe extern "C" fn switch_context(old: *mut Context, new: *const Context) {
@@ -193,23 +208,12 @@ impl ProcessManager {
     }
 
     pub fn switch(&self) {
-        let idle_idx = 0;
-
+        let next = self.scheduler();
         let mut current = self.current.borrow_mut();
-        let next = self
-            .procs
-            .iter()
-            .enumerate()
-            .find(|&(i, proc)| {
-                i != *current && proc.borrow().pid != 0 && proc.borrow().state == State::Runnable
-            })
-            .map(|(i, _)| i);
 
-        if next.is_none() && self.procs[*current].borrow().state == State::Runnable {
+        if next == *current {
             return;
         }
-
-        let next = next.unwrap_or(idle_idx);
 
         let mut current_proc = self.procs[*current].borrow_mut();
         let next_proc = self.procs[next].borrow();
