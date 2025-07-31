@@ -2,10 +2,10 @@
 #![no_std]
 #![feature(fn_align, pointer_is_aligned_to)]
 
+mod apps;
 mod constants;
 mod ipc;
 mod memory;
-mod playground;
 mod process;
 mod sbi;
 mod timer;
@@ -15,6 +15,7 @@ mod utils;
 use core::{arch::asm, fmt::Write, panic::PanicInfo, ptr};
 
 use crate::{
+    apps::playground,
     constants::{BSS, BSS_END, STACK_TOP},
     memory::alloc_pages,
     process::PM,
