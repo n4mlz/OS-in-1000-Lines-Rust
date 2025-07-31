@@ -15,6 +15,7 @@ use crate::{
 #[derive(Clone, Copy, PartialEq)]
 enum State {
     Unused,
+    Blocked,
     Runnable,
 }
 
@@ -60,7 +61,7 @@ impl Context {
 
 #[derive(Clone, Copy)]
 struct Process {
-    pid: u32,
+    pid: usize,
     state: State,
     page_table: PhysAddr,
     context: Context,
@@ -81,23 +82,64 @@ impl Process {
     }
 }
 
+struct RunQueue {
+    queue: RefCell<[usize; PROCS_MAX]>,
+    head: RefCell<usize>,
+    tail: RefCell<usize>,
+}
+
+impl RunQueue {
+    const fn new() -> Self {
+        RunQueue {
+            queue: RefCell::new([0; PROCS_MAX]),
+            head: RefCell::new(0),
+            tail: RefCell::new(0),
+        }
+    }
+
+    fn enqueue(&self, pid: usize) {
+        let idle_pid = 0;
+
+        if pid == idle_pid {
+            return;
+        }
+
+        let tail = *self.tail.borrow();
+        self.queue.borrow_mut()[tail] = pid;
+        *self.tail.borrow_mut() = (tail + 1) % PROCS_MAX;
+    }
+
+    fn dequeue(&self) -> Option<usize> {
+        if *self.head.borrow() == *self.tail.borrow() {
+            None
+        } else {
+            let head = *self.head.borrow();
+            let pid = self.queue.borrow()[head];
+            *self.head.borrow_mut() = (head + 1) % PROCS_MAX;
+            Some(pid)
+        }
+    }
+}
+
 pub struct ProcessManager {
     procs: [RefCell<Process>; PROCS_MAX],
     current: RefCell<usize>,
+    run_queue: RunQueue,
 }
 
 impl ProcessManager {
     pub const fn new() -> Self {
-        let idle_idx = 0;
+        let idle_pid = 0;
 
         ProcessManager {
             procs: [const { RefCell::new(Process::new()) }; PROCS_MAX],
-            current: RefCell::new(idle_idx),
+            current: RefCell::new(idle_pid),
+            run_queue: RunQueue::new(),
         }
     }
 
     pub fn init(&self) {
-        let idle_idx = 0;
+        let idle_pid = 0;
 
         let mut idle_proc = Process::new();
 
@@ -119,10 +161,10 @@ impl ProcessManager {
         idle_proc.page_table = page_table;
         idle_proc.sscratch = [0, idle_proc.stack.as_ptr() as usize + KERNEL_STACK_SIZE];
 
-        self.procs[idle_idx].replace(idle_proc);
+        self.procs[idle_pid].replace(idle_proc);
     }
 
-    pub fn create_process(&self, pc: usize) -> Option<u32> {
+    pub fn create_process(&self, pc: usize) -> Option<usize> {
         let idx = self
             .procs
             .iter()
@@ -142,12 +184,14 @@ impl ProcessManager {
             paddr = unsafe { paddr.add(PAGE_SIZE) };
         }
 
-        proc.pid = idx as u32 + 1;
+        proc.pid = idx;
         proc.state = State::Runnable;
         proc.page_table = page_table;
         proc.context.ra = pc;
         proc.context.sp = proc.stack.as_ptr() as usize + KERNEL_STACK_SIZE;
         proc.sscratch = [0, proc.stack.as_ptr() as usize + KERNEL_STACK_SIZE];
+
+        self.run_queue.enqueue(proc.pid);
 
         Some(proc.pid)
     }
@@ -193,26 +237,19 @@ impl ProcessManager {
     }
 
     pub fn switch(&self) {
-        let idle_idx = 0;
-
+        let next = self.scheduler();
         let mut current = self.current.borrow_mut();
-        let next = self
-            .procs
-            .iter()
-            .enumerate()
-            .find(|&(i, proc)| {
-                i != *current && proc.borrow().pid != 0 && proc.borrow().state == State::Runnable
-            })
-            .map(|(i, _)| i);
 
-        if next.is_none() && self.procs[*current].borrow().state == State::Runnable {
+        if next == *current {
             return;
         }
 
-        let next = next.unwrap_or(idle_idx);
-
         let mut current_proc = self.procs[*current].borrow_mut();
         let next_proc = self.procs[next].borrow();
+
+        if current_proc.state == State::Runnable {
+            self.run_queue.enqueue(*current);
+        }
 
         *current = next;
 
@@ -240,6 +277,42 @@ impl ProcessManager {
         unsafe {
             Self::switch_context(current_context, next_context);
         }
+    }
+
+    pub fn block_current(&self) {
+        let current = *self.current.borrow();
+        let mut proc = self.procs[current].borrow_mut();
+        if proc.state == State::Runnable {
+            proc.state = State::Blocked;
+        }
+    }
+
+    pub fn unblock(&self, pid: usize) {
+        if pid == 0 {
+            return;
+        }
+
+        let mut proc = self.procs[pid].borrow_mut();
+        if proc.state == State::Blocked {
+            proc.state = State::Runnable;
+            self.run_queue.enqueue(pid);
+        }
+    }
+
+    fn scheduler(&self) -> usize {
+        let idle_pid = 0;
+
+        let next = self.run_queue.dequeue();
+        if let Some(pid) = next {
+            return pid;
+        }
+
+        let current = *self.current.borrow();
+        if self.procs[current].borrow().state == State::Runnable {
+            return current;
+        }
+
+        idle_pid
     }
 }
 
