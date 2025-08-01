@@ -2,10 +2,10 @@
 #![no_std]
 #![feature(fn_align, pointer_is_aligned_to)]
 
+mod apps;
 mod constants;
 mod ipc;
 mod memory;
-mod playground;
 mod process;
 mod sbi;
 mod timer;
@@ -15,6 +15,7 @@ mod utils;
 use core::{arch::asm, fmt::Write, panic::PanicInfo, ptr};
 
 use crate::{
+    apps::{display, playground},
     constants::{BSS, BSS_END, STACK_TOP},
     memory::alloc_pages,
     process::PM,
@@ -56,8 +57,9 @@ fn kernel_main() -> ! {
     println!("alloc_pages test: paddr0 = {paddr0:x}");
     println!("alloc_pages test: paddr1 = {paddr1:x}");
 
-    PM.create_process(playground::proc_a_entry as usize);
-    PM.create_process(playground::proc_b_entry as usize);
+    PM.create_process(display::display_server as usize);
+    PM.create_process(playground::proc_a as usize);
+    PM.create_process(playground::proc_b as usize);
 
     PM.switch();
 

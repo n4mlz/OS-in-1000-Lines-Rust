@@ -54,5 +54,4 @@ pub fn handle_timer_irq() {
     set_next_timer();
 
     let now = get_time();
-    println!("Timer IRQ at time: {now}");
 }
