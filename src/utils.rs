@@ -69,7 +69,6 @@ macro_rules! println {
 #[macro_export]
 macro_rules! format {
     ($($arg:tt)*) => {{
-        extern crate alloc;
         let mut s = alloc::string::String::new();
         let _ = core::fmt::write(&mut s, format_args!($($arg)*));
         s
