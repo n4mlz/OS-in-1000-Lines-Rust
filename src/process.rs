@@ -9,13 +9,15 @@ use crate::{
         FREE_RAM_END, KERNEL_BASE, KERNEL_STACK_SIZE, PAGE_R, PAGE_SIZE, PAGE_W, PAGE_X, PROCS_MAX,
         PROCS_QUANTUM_US, SATP_SV32, TIMER_QUANTUM_US,
     },
+    ipc::Ipc,
     memory::{alloc_pages, map_page},
     utils::{Addr, PhysAddr, VirtAddr},
 };
 
 #[derive(Clone, Copy, PartialEq)]
-enum State {
+pub enum State {
     Unused,
+    Blocked,
     Runnable,
 }
 
@@ -59,48 +61,112 @@ impl Context {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Pid(usize);
+
+impl Pid {
+    pub const fn new(pid: usize) -> Self {
+        Pid(pid)
+    }
+
+    pub const fn idle() -> Self {
+        Pid(0)
+    }
+
+    pub fn is_idle(&self) -> bool {
+        self == &Pid::idle()
+    }
+
+    pub fn as_usize(&self) -> usize {
+        self.0
+    }
+}
+
 #[derive(Clone, Copy)]
-struct Process {
-    pid: u32,
-    state: State,
+pub struct Process {
+    pub pid: Pid,
+    pub state: State,
     page_table: PhysAddr,
     context: Context,
     quantum: u64,
     sscratch: [usize; 2],
     stack: [usize; KERNEL_STACK_SIZE],
+    pub ipc: Ipc,
 }
 
 impl Process {
     const fn new() -> Self {
         Process {
-            pid: 0,
+            pid: Pid(0),
             state: State::Unused,
             page_table: PhysAddr::NULL,
             context: Context::new(),
             quantum: 0,
             sscratch: [0; 2],
             stack: [0; KERNEL_STACK_SIZE],
+            ipc: Ipc::new(),
+        }
+    }
+}
+
+struct RunQueue {
+    queue: RefCell<[Pid; PROCS_MAX]>,
+    head: RefCell<usize>,
+    tail: RefCell<usize>,
+}
+
+impl RunQueue {
+    const fn new() -> Self {
+        RunQueue {
+            queue: RefCell::new([Pid(0); PROCS_MAX]),
+            head: RefCell::new(0),
+            tail: RefCell::new(0),
+        }
+    }
+
+    fn enqueue(&self, pid: Pid) {
+        if pid.is_idle() {
+            return;
+        }
+
+        let tail = *self.tail.borrow();
+        self.queue.borrow_mut()[tail] = pid;
+        *self.tail.borrow_mut() = (tail + 1) % PROCS_MAX;
+    }
+
+    fn dequeue(&self) -> Option<Pid> {
+        if *self.head.borrow() == *self.tail.borrow() {
+            None
+        } else {
+            let head = *self.head.borrow();
+            let pid = self.queue.borrow()[head];
+            *self.head.borrow_mut() = (head + 1) % PROCS_MAX;
+            Some(pid)
         }
     }
 }
 
 pub struct ProcessManager {
-    procs: [RefCell<Process>; PROCS_MAX],
-    current: RefCell<usize>,
+    pub procs: [RefCell<Process>; PROCS_MAX],
+    pub current: RefCell<Pid>,
+    run_queue: RunQueue,
 }
 
 impl ProcessManager {
     pub const fn new() -> Self {
-        let idle_idx = 0;
-
         ProcessManager {
             procs: [const { RefCell::new(Process::new()) }; PROCS_MAX],
-            current: RefCell::new(idle_idx),
+            current: RefCell::new(Pid::idle()),
+            run_queue: RunQueue::new(),
         }
     }
 
+    pub fn current_pid(&self) -> Pid {
+        *self.current.borrow()
+    }
+
     pub fn init(&self) {
-        let idle_idx = 0;
+        let idle_pid = Pid::idle();
 
         let mut idle_proc = Process::new();
 
@@ -117,15 +183,15 @@ impl ProcessManager {
             paddr = unsafe { paddr.add(PAGE_SIZE) };
         }
 
-        idle_proc.pid = 0;
+        idle_proc.pid = idle_pid;
         idle_proc.state = State::Runnable;
         idle_proc.page_table = page_table;
         idle_proc.sscratch = [0, idle_proc.stack.as_ptr() as usize + KERNEL_STACK_SIZE];
 
-        self.procs[idle_idx].replace(idle_proc);
+        self.procs[idle_pid.as_usize()].replace(idle_proc);
     }
 
-    pub fn create_process(&self, pc: usize) -> Option<u32> {
+    pub fn create_process(&self, pc: usize) -> Option<Pid> {
         let idx = self
             .procs
             .iter()
@@ -145,13 +211,15 @@ impl ProcessManager {
             paddr = unsafe { paddr.add(PAGE_SIZE) };
         }
 
-        proc.pid = idx as u32 + 1;
+        proc.pid = Pid(idx);
         proc.state = State::Runnable;
         proc.page_table = page_table;
         proc.context.ra = pc;
         proc.context.sp = proc.stack.as_ptr() as usize + KERNEL_STACK_SIZE;
         proc.quantum = 0;
         proc.sscratch = [0, proc.stack.as_ptr() as usize + KERNEL_STACK_SIZE];
+
+        self.run_queue.enqueue(proc.pid);
 
         Some(proc.pid)
     }
@@ -212,21 +280,19 @@ impl ProcessManager {
     }
 
     pub fn switch(&self) {
-        let idle_idx = 0;
-
         let next = self.scheduler();
         let mut current = self.current.borrow_mut();
-
-        if next != idle_idx {
-            self.procs[next].borrow_mut().quantum = PROCS_QUANTUM_US;
-        }
 
         if next == *current {
             return;
         }
 
-        let mut current_proc = self.procs[*current].borrow_mut();
-        let next_proc = self.procs[next].borrow();
+        let mut current_proc = self.procs[current.as_usize()].borrow_mut();
+        let next_proc = self.procs[next.as_usize()].borrow();
+
+        if current_proc.state == State::Runnable {
+            self.run_queue.enqueue(*current);
+        }
 
         *current = next;
 
@@ -271,6 +337,39 @@ impl ProcessManager {
         if is_quantum_expired {
             self.switch();
         }
+    }
+
+    pub fn block_current(&self) {
+        let mut proc = self.procs[self.current_pid().as_usize()].borrow_mut();
+        if proc.state == State::Runnable {
+            proc.state = State::Blocked;
+        }
+    }
+
+    pub fn unblock(&self, pid: Pid) {
+        if pid.is_idle() {
+            return;
+        }
+
+        let mut proc = self.procs[pid.as_usize()].borrow_mut();
+        if proc.state == State::Blocked {
+            proc.state = State::Runnable;
+            self.run_queue.enqueue(pid);
+        }
+    }
+
+    fn scheduler(&self) -> Pid {
+        let next = self.run_queue.dequeue();
+        if let Some(pid) = next {
+            return pid;
+        }
+
+        let current = self.current_pid();
+        if self.procs[current.as_usize()].borrow().state == State::Runnable {
+            return current;
+        }
+
+        Pid::idle()
     }
 }
 

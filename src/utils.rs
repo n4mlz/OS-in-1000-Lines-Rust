@@ -66,6 +66,15 @@ macro_rules! println {
     });
 }
 
+#[macro_export]
+macro_rules! format {
+    ($($arg:tt)*) => {{
+        let mut s = alloc::string::String::new();
+        let _ = core::fmt::write(&mut s, format_args!($($arg)*));
+        s
+    }};
+}
+
 pub struct Writer;
 
 impl Write for Writer {
