@@ -2,6 +2,9 @@
 #![no_std]
 #![feature(fn_align, pointer_is_aligned_to)]
 
+#[macro_use]
+extern crate alloc;
+
 mod apps;
 mod constants;
 mod ipc;
@@ -58,8 +61,11 @@ fn kernel_main() -> ! {
     println!("alloc_pages test: paddr1 = {paddr1:x}");
 
     PM.create_process(display::display_server as usize);
+
     PM.create_process(playground::proc_a as usize);
     PM.create_process(playground::proc_b as usize);
+    PM.create_process(playground::proc_c as usize);
+    PM.create_process(playground::proc_d as usize);
 
     PM.switch();
 
