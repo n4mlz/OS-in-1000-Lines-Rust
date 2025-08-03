@@ -1,5 +1,3 @@
-extern crate alloc;
-
 use core::fmt::Write;
 
 use crate::ipc::{Ipc, Message, Src};
@@ -31,6 +29,14 @@ fn ansi_set_bg(color: u8) {
 
 fn ansi_reset() {
     print!("\x1B[0m");
+}
+
+fn ansi_hide_cursor() {
+    print!("\x1B[?25l");
+}
+
+fn ansi_show_cursor() {
+    print!("\x1B[?25h");
 }
 
 fn quadrant_origin(display: u8) -> (u16, u16) {
@@ -105,6 +111,7 @@ fn draw_cell(display: u8, x: u8, y: u8, fg: u8, bg: u8, ch: char) {
 }
 
 pub fn display_server() -> ! {
+    ansi_hide_cursor();
     ansi_clear_screen();
     draw_separators();
 

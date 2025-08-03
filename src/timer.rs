@@ -1,8 +1,6 @@
-use core::{arch::asm, fmt::Write};
+use core::arch::asm;
 
-use crate::{
-    constants::TIMER_QUANTUM_US, print, println, sbi::sbi_call, utils::irq_enable, write_csr_set,
-};
+use crate::{constants::TIMER_QUANTUM_US, sbi::sbi_call, utils::irq_enable, write_csr_set};
 
 const SBI_EID_TIME: usize = 0x54494d45;
 const SBI_FID_SET_TIMER: usize = 0;
