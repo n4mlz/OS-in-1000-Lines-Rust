@@ -1,12 +1,13 @@
 use core::{
     arch::{asm, naked_asm},
     cell::RefCell,
+    cmp::min,
 };
 
 use crate::{
     constants::{
         FREE_RAM_END, KERNEL_BASE, KERNEL_STACK_SIZE, PAGE_R, PAGE_SIZE, PAGE_W, PAGE_X, PROCS_MAX,
-        SATP_SV32,
+        PROCS_QUANTUM_US, SATP_SV32, TIMER_QUANTUM_US,
     },
     ipc::Ipc,
     memory::{alloc_pages, map_page},
@@ -87,6 +88,7 @@ pub struct Process {
     pub state: State,
     page_table: PhysAddr,
     context: Context,
+    quantum: u64,
     sscratch: [usize; 2],
     stack: [usize; KERNEL_STACK_SIZE],
     pub ipc: Ipc,
@@ -99,6 +101,7 @@ impl Process {
             state: State::Unused,
             page_table: PhysAddr::NULL,
             context: Context::new(),
+            quantum: 0,
             sscratch: [0; 2],
             stack: [0; KERNEL_STACK_SIZE],
             ipc: Ipc::new(),
@@ -213,11 +216,27 @@ impl ProcessManager {
         proc.page_table = page_table;
         proc.context.ra = pc;
         proc.context.sp = proc.stack.as_ptr() as usize + KERNEL_STACK_SIZE;
+        proc.quantum = 0;
         proc.sscratch = [0, proc.stack.as_ptr() as usize + KERNEL_STACK_SIZE];
 
         self.run_queue.enqueue(proc.pid);
 
         Some(proc.pid)
+    }
+
+    fn scheduler(&self) -> usize {
+        let idle_idx = 0;
+
+        let current = self.current.borrow();
+
+        self.procs
+            .iter()
+            .enumerate()
+            .find(|&(i, proc)| {
+                i != *current && proc.borrow().pid != 0 && proc.borrow().state == State::Runnable
+            })
+            .map(|(i, _)| i)
+            .unwrap_or(idle_idx)
     }
 
     #[unsafe(naked)]
@@ -300,6 +319,23 @@ impl ProcessManager {
 
         unsafe {
             Self::switch_context(current_context, next_context);
+        }
+    }
+
+    pub fn tick(&self) {
+        let is_quantum_expired;
+
+        {
+            let current = self.current.borrow_mut();
+            let mut current_proc = self.procs[*current].borrow_mut();
+
+            current_proc.quantum -= min(current_proc.quantum, TIMER_QUANTUM_US);
+
+            is_quantum_expired = current_proc.quantum == 0;
+        };
+
+        if is_quantum_expired {
+            self.switch();
         }
     }
 

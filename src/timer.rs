@@ -1,11 +1,15 @@
 use core::arch::asm;
 
-use crate::{constants::TIMER_QUANTUM_US, sbi::sbi_call, utils::irq_enable, write_csr_set};
+use crate::{
+    constants::TIMER_QUANTUM_US, process::PM, read_csr, sbi::sbi_call, utils::irq_enable,
+    write_csr_set,
+};
 
 const SBI_EID_TIME: usize = 0x54494d45;
 const SBI_FID_SET_TIMER: usize = 0;
 
 const TIMEBASE_FREQ: u64 = 10_000_000; // 10 MHz
+pub const TIMER_DELTA: u64 = TIMER_QUANTUM_US * TIMEBASE_FREQ / 1_000_000;
 
 fn get_time() -> u64 {
     let (mut hi, mut lo, mut tmp): (u32, u32, u32);
@@ -24,8 +28,7 @@ fn get_time() -> u64 {
 
 fn set_next_timer() {
     let now = get_time();
-    let delta = TIMER_QUANTUM_US * TIMEBASE_FREQ / 1_000_000;
-    let next = now + delta;
+    let next = now + TIMER_DELTA;
 
     let lo = next as u32 as usize;
     let hi = (next >> 32) as u32 as usize;
@@ -43,6 +46,11 @@ pub fn enable_timer_irq() {
     }
 }
 
+pub fn is_enabled_timer_irq() -> bool {
+    let sie = read_csr!("sie");
+    (sie & (1 << 5)) != 0
+}
+
 pub fn init_timer() {
     enable_timer_irq();
     set_next_timer();
@@ -50,6 +58,5 @@ pub fn init_timer() {
 
 pub fn handle_timer_irq() {
     set_next_timer();
-
-    let now = get_time();
+    PM.tick();
 }
